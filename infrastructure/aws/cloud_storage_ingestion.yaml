@@ -1,0 +1,148 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform:
+  - AWS::LanguageExtensions
+Description: >
+  Reference CloudFormation template that provisions an S3 bucket emitting object
+  created notifications to an SNS topic which fans out messages to one or more
+  SQS queues with dedicated dead-letter queues and subscription filter policies.
+Parameters:
+  Project:
+    Type: String
+    Description: Project slug used for resource naming.
+  BucketName:
+    Type: String
+    Description: Name of the S3 bucket that stores raw ingestion files.
+  FileSuffixFilter:
+    Type: String
+    Description: Optional suffix filter for S3 events (e.g. "json"). Leave blank to receive all events.
+    Default: ''
+  SubscriberQueues:
+    Type: List<String>
+    Description: Logical stream names that map to SQS queues.
+  SQSVisibilityTimeoutSeconds:
+    Type: Number
+    Description: Visibility timeout for processing queues.
+    Default: 900
+  SQSMessageRetentionSeconds:
+    Type: Number
+    Description: Retention period for processing queues.
+    Default: 1209600
+Conditions:
+  HasFileSuffixFilter: !Not [!Equals [!Ref FileSuffixFilter, '']]
+Resources:
+  RawIngestionBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      NotificationConfiguration:
+        TopicConfigurations:
+          - Event: s3:ObjectCreated:*
+            Topic: !Ref RawIngestionTopic
+            Filter: !If
+              - HasFileSuffixFilter
+              - S3Key:
+                  Rules:
+                    - Name: suffix
+                      Value: !Ref FileSuffixFilter
+              - !Ref AWS::NoValue
+      Tags:
+        - Key: Component
+          Value: cloud-ingestion
+        - Key: Project
+          Value: !Ref Project
+  RawIngestionTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${Project}-raw-ingestion'
+      Tags:
+        - Key: Component
+          Value: sns
+        - Key: Project
+          Value: !Ref Project
+  RawIngestionTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref RawIngestionTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref RawIngestionTopic
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:s3:::${BucketName}'
+  Fn::ForEach::SubscriberQueues:
+    - QueueName
+    - !Ref SubscriberQueues
+    - ${QueueName}DeadLetterQueue:
+        Type: AWS::SQS::Queue
+        Properties:
+          QueueName: !Sub '${Project}-${QueueName}-dlq'
+          MessageRetentionPeriod: 1209600
+          Tags:
+            - Key: Component
+              Value: sqs-dlq
+            - Key: Project
+              Value: !Ref Project
+            - Key: Stream
+              Value: !Ref QueueName
+      ${QueueName}ProcessingQueue:
+        Type: AWS::SQS::Queue
+        Properties:
+          QueueName: !Sub '${Project}-${QueueName}'
+          VisibilityTimeout: !Ref SQSVisibilityTimeoutSeconds
+          MessageRetentionPeriod: !Ref SQSMessageRetentionSeconds
+          ReceiveMessageWaitTimeSeconds: 20
+          RedrivePolicy:
+            deadLetterTargetArn: !GetAtt ${QueueName}DeadLetterQueue.Arn
+            maxReceiveCount: 5
+          Tags:
+            - Key: Component
+              Value: sqs
+            - Key: Project
+              Value: !Ref Project
+            - Key: Stream
+              Value: !Ref QueueName
+      ${QueueName}QueuePolicy:
+        Type: AWS::SQS::QueuePolicy
+        Properties:
+          Queues:
+            - !Ref ${QueueName}ProcessingQueue
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: AllowSNSPublish
+                Effect: Allow
+                Principal:
+                  Service: sns.amazonaws.com
+                Action: sqs:SendMessage
+                Resource: !GetAtt ${QueueName}ProcessingQueue.Arn
+                Condition:
+                  ArnEquals:
+                    aws:SourceArn: !Ref RawIngestionTopic
+      ${QueueName}Subscription:
+        Type: AWS::SNS::Subscription
+        Properties:
+          TopicArn: !Ref RawIngestionTopic
+          Protocol: sqs
+          Endpoint: !GetAtt ${QueueName}ProcessingQueue.Arn
+          RawMessageDelivery: true
+          FilterPolicy:
+            stream:
+              - !Ref QueueName
+Outputs:
+  BucketName:
+    Description: Deployed S3 bucket name.
+    Value: !Ref RawIngestionBucket
+  TopicArn:
+    Description: SNS topic ARN for raw ingestion events.
+    Value: !Ref RawIngestionTopic
+  QueueNames:
+    Description: Logical names of subscriber queues.
+    Value: !Join [',', !Ref SubscriberQueues]
