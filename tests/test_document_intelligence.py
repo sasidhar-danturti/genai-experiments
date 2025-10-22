@@ -10,6 +10,7 @@ from databricks.document_intelligence_workflow import (  # noqa: E402
     DocumentIntelligenceWorkflow,
     WorkflowConfig,
 )
+from databricks.enrichment import EnrichmentResponse  # noqa: E402
 from databricks.document_intelligence_storage import (  # noqa: E402
     InMemoryDocumentResultStore,
 )
@@ -46,6 +47,34 @@ class _RecordingAzureClient:
             raise AssertionError("No responses remaining")
         payload = self._responses.pop(0)
         return _FakePoller(payload)
+
+
+class _RecordingEnrichmentProvider:
+    def __init__(self, *, name: str = "keywords", confidence: float = 0.9):
+        self.name = name
+        self.confidence = confidence
+        self.max_batch_size = 1
+        self.timeout_seconds = None
+        self.calls = []
+
+    def enrich(self, requests):
+        self.calls.append([request.document_id for request in requests])
+        responses = []
+        for request in requests:
+            responses.append(
+                EnrichmentResponse(
+                    document_id=request.document_id,
+                    enrichments=[
+                        {
+                            "type": "keywords",
+                            "content": {"keywords": [request.document_id]},
+                            "confidence": self.confidence,
+                            "model": "unit-test",
+                        }
+                    ],
+                )
+            )
+        return responses
 
 
 @pytest.fixture
@@ -357,3 +386,33 @@ def test_email_parser_supports_attachments():
     assert canonical.text_spans[0].provenance.method == "body_text"
     assert canonical.attachments[0].file_name == "invoice.pdf"
     assert canonical.attachments[0].mime_type == "application/pdf"
+
+
+def test_workflow_triggers_enrichment_when_requested(sample_analyze_result):
+    client = _RecordingAzureClient([sample_analyze_result])
+    store = InMemoryDocumentResultStore()
+    provider = _RecordingEnrichmentProvider()
+    config = WorkflowConfig(
+        model_id="prebuilt-invoice",
+        enrichment_providers=[provider],
+    )
+    workflow = DocumentIntelligenceWorkflow(client=client, store=store, config=config)
+
+    result = workflow.process(
+        document_id="doc-enrich",
+        document_bytes=b"file-bytes",
+        source_uri="abfss://container/doc.pdf",
+        metadata={},
+        enrich_with=[provider.name],
+    )
+
+    assert provider.calls == [["doc-enrich"]]
+    assert result.document is not None
+    assert result.document.enrichments
+    enrichment = result.document.enrichments[0]
+    assert enrichment.enrichment_type == "keywords"
+    assert enrichment.provider == provider.name
+    assert enrichment.confidence == pytest.approx(provider.confidence)
+
+    persisted = store._records[(result.document.document_id, result.document.checksum)]
+    assert persisted.enrichments
