@@ -111,6 +111,7 @@ def test_adapter_creates_canonical_document(sample_analyze_result, adapter):
     assert canonical.metadata["provider"] == "azure_document_intelligence"
     assert canonical.metadata["source"] == "unit-test"
     assert len(canonical.text_spans) == 1
+    assert canonical.summaries == []
     assert canonical.text_spans[0].provenance.parser == "azure_document_intelligence"
     assert canonical.text_spans[0].confidence_signals[0].source == "azure_document_intelligence"
     assert canonical.tables[0].cells[0].content == "item"
@@ -135,6 +136,9 @@ def test_workflow_is_idempotent_and_supports_force(sample_analyze_result):
     )
 
     assert not result.skipped
+    assert result.document is not None
+    assert result.document.summaries
+    assert result.document.summaries[0].method == "heuristic_leading_sentences"
     assert len(client.calls) == 1
     assert client.calls[0][2]["pages"] == [1]
 

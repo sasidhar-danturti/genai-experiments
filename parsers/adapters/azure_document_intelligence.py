@@ -71,6 +71,7 @@ class AzureDocumentIntelligenceAdapter(ParserAdapter):
             fields=fields,
             visual_descriptions=[],
             page_segments=page_segments,
+            summaries=[],
             document_type=document_type,
             mime_type=mime_type,
             metadata=metadata_payload,
