@@ -274,6 +274,35 @@ class DocumentAttachment:
 
 
 @dataclass(frozen=True)
+class DocumentSummary:
+    """Machine- or heuristically-generated summary for a document."""
+
+    summary: str
+    confidence: float
+    method: str
+    title: Optional[str] = None
+    model: Optional[str] = None
+    justification: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, object]:
+        payload: Dict[str, object] = {
+            "summary": self.summary,
+            "confidence": self.confidence,
+            "method": self.method,
+        }
+        if self.title is not None:
+            payload["title"] = self.title
+        if self.model is not None:
+            payload["model"] = self.model
+        if self.justification is not None:
+            payload["justification"] = self.justification
+        if self.metadata:
+            payload["metadata"] = dict(self.metadata)
+        return payload
+
+
+@dataclass(frozen=True)
 class CanonicalDocument:
     """Top-level canonical document payload."""
 
@@ -286,6 +315,7 @@ class CanonicalDocument:
     visual_descriptions: List[VisualDescription] = field(default_factory=list)
     page_segments: List[PageSegment] = field(default_factory=list)
     attachments: List[DocumentAttachment] = field(default_factory=list)
+    summaries: List[DocumentSummary] = field(default_factory=list)
     document_type: Optional[str] = None
     mime_type: Optional[str] = None
     schema_version: str = SCHEMA_VERSION
@@ -302,6 +332,8 @@ class CanonicalDocument:
             "tables": [table.to_dict() for table in self.tables],
             "fields": [field.to_dict() for field in self.fields],
         }
+        if self.summaries:
+            payload["summaries"] = [summary.to_dict() for summary in self.summaries]
         if self.visual_descriptions:
             payload["visual_descriptions"] = [visual.to_dict() for visual in self.visual_descriptions]
         if self.page_segments:

@@ -53,6 +53,7 @@ class DatabricksLLMImageAdapter(ParserAdapter):
             fields=fields,
             visual_descriptions=visuals,
             page_segments=page_segments,
+            summaries=[],
             document_type=document_type,
             mime_type=mime_type,
             metadata=metadata_payload,

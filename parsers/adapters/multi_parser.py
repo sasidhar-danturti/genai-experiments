@@ -40,6 +40,7 @@ class MultiParserAdapter(ParserAdapter):
         combined_visuals = []
         combined_segments: List[PageSegment] = []
         combined_attachments: List[DocumentAttachment] = []
+        combined_summaries = []
         parsers_used: List[str] = []
 
         document_type = shared_metadata.get("document_type")
@@ -73,6 +74,7 @@ class MultiParserAdapter(ParserAdapter):
             combined_visuals.extend(canonical.visual_descriptions)
             combined_segments.extend(canonical.page_segments)
             combined_attachments.extend(canonical.attachments)
+            combined_summaries.extend(canonical.summaries)
 
             if document_type is None and canonical.document_type is not None:
                 document_type = canonical.document_type
@@ -98,6 +100,7 @@ class MultiParserAdapter(ParserAdapter):
             visual_descriptions=combined_visuals,
             page_segments=combined_segments,
             attachments=combined_attachments,
+            summaries=combined_summaries,
             document_type=document_type,
             mime_type=mime_type,
             metadata=metadata_payload,

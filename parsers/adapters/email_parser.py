@@ -60,6 +60,7 @@ class EmailParserAdapter(ParserAdapter):
             visual_descriptions=[],
             page_segments=page_segments,
             attachments=attachments,
+            summaries=[],
             document_type=document_type,
             mime_type=mime_type,
             metadata=metadata_payload,

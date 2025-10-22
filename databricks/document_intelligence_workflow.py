@@ -5,11 +5,12 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, Optional, Protocol
 
 from parsers.adapters import AzureDocumentIntelligenceAdapter, ParserAdapter
 from parsers.canonical_schema import CanonicalDocument
+from .summarization import DefaultDocumentSummarizer, DocumentSummarizer
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ class WorkflowConfig:
     max_retries: int = 3
     retry_backoff_seconds: float = 5.0
     adapter: ParserAdapter = field(default_factory=AzureDocumentIntelligenceAdapter)
+    summarizer: DocumentSummarizer = field(default_factory=DefaultDocumentSummarizer)
 
 
 class AzureDocumentIntelligenceService:
@@ -98,6 +100,7 @@ class DocumentIntelligenceWorkflow:
         self._store = store
         self._config = config
         self._adapter = config.adapter
+        self._summarizer = config.summarizer
 
     def process(
         self,
@@ -130,6 +133,14 @@ class DocumentIntelligenceWorkflow:
             checksum=checksum,
             metadata=metadata,
         )
+
+        if self._summarizer is not None:
+            summaries = self._summarizer.summarise(canonical)
+            if summaries:
+                canonical = replace(
+                    canonical,
+                    summaries=list(canonical.summaries) + summaries,
+                )
 
         self._store.save(canonical)
         return WorkflowResult(document=canonical, skipped=False)
