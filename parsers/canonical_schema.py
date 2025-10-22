@@ -303,6 +303,35 @@ class DocumentSummary:
 
 
 @dataclass(frozen=True)
+class DocumentEnrichment:
+    """Structured representation of downstream enrichment signals."""
+
+    enrichment_type: str
+    provider: str
+    content: Dict[str, Any]
+    confidence: Optional[float] = None
+    model: Optional[str] = None
+    duration_ms: Optional[int] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, object]:
+        payload: Dict[str, object] = {
+            "enrichment_type": self.enrichment_type,
+            "provider": self.provider,
+            "content": dict(self.content),
+        }
+        if self.confidence is not None:
+            payload["confidence"] = self.confidence
+        if self.model is not None:
+            payload["model"] = self.model
+        if self.duration_ms is not None:
+            payload["duration_ms"] = self.duration_ms
+        if self.metadata:
+            payload["metadata"] = dict(self.metadata)
+        return payload
+
+
+@dataclass(frozen=True)
 class CanonicalDocument:
     """Top-level canonical document payload."""
 
@@ -316,6 +345,7 @@ class CanonicalDocument:
     page_segments: List[PageSegment] = field(default_factory=list)
     attachments: List[DocumentAttachment] = field(default_factory=list)
     summaries: List[DocumentSummary] = field(default_factory=list)
+    enrichments: List[DocumentEnrichment] = field(default_factory=list)
     document_type: Optional[str] = None
     mime_type: Optional[str] = None
     schema_version: str = SCHEMA_VERSION
@@ -334,6 +364,8 @@ class CanonicalDocument:
         }
         if self.summaries:
             payload["summaries"] = [summary.to_dict() for summary in self.summaries]
+        if self.enrichments:
+            payload["enrichments"] = [enrichment.to_dict() for enrichment in self.enrichments]
         if self.visual_descriptions:
             payload["visual_descriptions"] = [visual.to_dict() for visual in self.visual_descriptions]
         if self.page_segments:

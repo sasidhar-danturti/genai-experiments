@@ -6,10 +6,11 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, Iterable, Optional, Protocol
+from typing import Any, Dict, Iterable, List, Optional, Protocol, Sequence
 
 from parsers.adapters import AzureDocumentIntelligenceAdapter, ParserAdapter
-from parsers.canonical_schema import CanonicalDocument
+from parsers.canonical_schema import CanonicalDocument, DocumentEnrichment
+from .enrichment import EnrichmentDispatcher, EnrichmentProvider
 from .summarization import DefaultDocumentSummarizer, DocumentSummarizer
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class WorkflowConfig:
     retry_backoff_seconds: float = 5.0
     adapter: ParserAdapter = field(default_factory=AzureDocumentIntelligenceAdapter)
     summarizer: DocumentSummarizer = field(default_factory=DefaultDocumentSummarizer)
+    enrichment_providers: Sequence[EnrichmentProvider] = field(default_factory=tuple)
 
 
 class AzureDocumentIntelligenceService:
@@ -101,6 +103,11 @@ class DocumentIntelligenceWorkflow:
         self._config = config
         self._adapter = config.adapter
         self._summarizer = config.summarizer
+        self._enrichment_dispatcher = (
+            EnrichmentDispatcher(config.enrichment_providers)
+            if config.enrichment_providers
+            else None
+        )
 
     def process(
         self,
@@ -112,6 +119,7 @@ class DocumentIntelligenceWorkflow:
         pages: Optional[Iterable[int]] = None,
         content_type: Optional[str] = None,
         force: bool = False,
+        enrich_with: Optional[Iterable[str]] = None,
     ) -> WorkflowResult:
         checksum = _checksum(document_bytes)
         metadata = metadata or {}
@@ -141,6 +149,21 @@ class DocumentIntelligenceWorkflow:
                     canonical,
                     summaries=list(canonical.summaries) + summaries,
                 )
+
+        if self._enrichment_dispatcher is not None and enrich_with:
+            enrichment_requests = list(enrich_with)
+            if enrichment_requests:
+                enrichment_map = self._enrichment_dispatcher.dispatch(
+                    [canonical], enrichment_requests
+                )
+                enrichments: List[DocumentEnrichment] = enrichment_map.get(
+                    canonical.document_id, []
+                )
+                if enrichments:
+                    canonical = replace(
+                        canonical,
+                        enrichments=list(canonical.enrichments) + list(enrichments),
+                    )
 
         self._store.save(canonical)
         return WorkflowResult(document=canonical, skipped=False)
