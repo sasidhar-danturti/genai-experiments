@@ -5,7 +5,7 @@ It supports configurable batch sizes, fan-out to worker clusters via the Jobs
 API, and persists raw metadata to Delta Lake for monitoring/replay.
 
 Document routing, categorisation, and strategy selection live in the
-``databricks.routing`` package, allowing the ingestion loop to orchestrate
+``idp_service.routing`` package, allowing the ingestion loop to orchestrate
 production-ready routing strategies without embedding the implementation
 directly in this module.
 
@@ -32,7 +32,7 @@ from botocore.exceptions import ClientError
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import current_timestamp, lit
 
-from databricks.routing import (
+from idp_service.routing import (
     DocumentAnalysis,
     DocumentCategory,
     DocumentRouter,

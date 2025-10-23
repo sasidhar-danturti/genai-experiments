@@ -70,7 +70,7 @@ Use the Databricks DLQ replay utility when the underlying issue has been
 resolved:
 
 ```bash
-python -m databricks.dlq_replay \
+python -m idp_service.dlq_replay \
   https://sqs.<region>.amazonaws.com/<account>/<stream>-dlq \
   https://sqs.<region>.amazonaws.com/<account>/<stream> \
   --region <region> \
