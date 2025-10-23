@@ -6,12 +6,12 @@ import pytest
 # Allow tests to import the project packages without installation.
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from databricks.document_intelligence_workflow import (  # noqa: E402
+from idp_service.document_intelligence_workflow import (  # noqa: E402
     DocumentIntelligenceWorkflow,
     WorkflowConfig,
 )
-from databricks.enrichment import EnrichmentResponse  # noqa: E402
-from databricks.document_intelligence_storage import (  # noqa: E402
+from idp_service.enrichment import EnrichmentResponse  # noqa: E402
+from idp_service.document_intelligence_storage import (  # noqa: E402
     InMemoryDocumentResultStore,
 )
 from parsers.adapters.azure_document_intelligence import (  # noqa: E402
