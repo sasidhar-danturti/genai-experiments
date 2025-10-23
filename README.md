@@ -19,6 +19,11 @@ into Databricks for downstream processing.
    monitoring and replay.
 3. **Delta Lake tracking tables** – `delta/raw_ingestion_metadata.sql` creates
    the metadata and run-summary tables that persist ingestion state.
+4. **Document Processing API** – `services/document_processing_api` provides
+   Lambda handlers and supporting utilities that expose submit/status/result
+   endpoints via API Gateway. Requests enqueue work to SQS, statuses are backed
+   by DynamoDB, and results stream from Databricks SQL, all while returning the
+   canonical schema described in `parsers/canonical_schema.py`.
 
 ### Usage notes
 
@@ -28,3 +33,8 @@ into Databricks for downstream processing.
   necessary environment variables (e.g., `INGESTION_QUEUE_URL`).
 - Execute the SQL script in a Databricks SQL warehouse or notebook to create
   the tracking tables before running the job.
+- Review `docs/runbooks/document_processing_api.md` for the API contract,
+  deployment runbook, and IAM references.
+- Integrate against the API using the helper in
+  `clients/document_processing_client.py`, which demonstrates submission,
+  polling, and result pagination.
