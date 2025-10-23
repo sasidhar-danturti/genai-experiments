@@ -13,7 +13,8 @@ provider "aws" {
 }
 
 locals {
-  bucket_name = var.bucket_name
+  bucket_name           = var.bucket_name
+  sqs_subscriber_map    = { for idx, name in var.sqs_subscribers : name => idx }
 }
 
 resource "aws_s3_bucket" "raw_ingestion" {
@@ -145,6 +146,163 @@ resource "aws_sns_topic_subscription" "processing" {
   })
 }
 
+resource "aws_cloudwatch_metric_alarm" "queue_depth" {
+  for_each = local.sqs_subscriber_map
+
+  alarm_name          = "${var.project}-${each.key}-queue-depth-high"
+  alarm_description   = "Queue depth for ${each.key} exceeded threshold"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  datapoints_to_alarm = 2
+  threshold           = var.queue_depth_alarm_threshold
+  treat_missing_data  = "notBreaching"
+
+  metric_query {
+    id = "queueDepth"
+    metric {
+      metric_name = "ApproximateNumberOfMessagesVisible"
+      namespace   = "AWS/SQS"
+      period      = 60
+      stat        = "Average"
+      dimensions = {
+        QueueName = aws_sqs_queue.processing[each.value].name
+      }
+    }
+    return_data = true
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "parser_failure_rate" {
+  for_each = local.sqs_subscriber_map
+
+  alarm_name          = "${var.project}-${each.key}-parser-failure-rate"
+  alarm_description   = "Parser failure rate for ${each.key} exceeded threshold"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  datapoints_to_alarm = 2
+  threshold           = var.parser_failure_rate_threshold
+  treat_missing_data  = "notBreaching"
+
+  metric_query {
+    id = "success"
+    metric {
+      metric_name = "ParserSuccess"
+      namespace   = var.cloudwatch_namespace
+      period      = 60
+      stat        = "Sum"
+      dimensions = {
+        QueueName = aws_sqs_queue.processing[each.value].name
+      }
+    }
+    return_data = false
+  }
+
+  metric_query {
+    id = "failure"
+    metric {
+      metric_name = "ParserFailure"
+      namespace   = var.cloudwatch_namespace
+      period      = 60
+      stat        = "Sum"
+      dimensions = {
+        QueueName = aws_sqs_queue.processing[each.value].name
+      }
+    }
+    return_data = false
+  }
+
+  metric_query {
+    id          = "ratio"
+    expression  = "IF((success+failure)>0, failure/(success+failure), 0)"
+    label       = "ParserFailureRatio"
+    return_data = true
+  }
+}
+
+resource "aws_cloudwatch_dashboard" "ingestion" {
+  dashboard_name = "${var.project}-ingestion-observability"
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        "type"       = "metric"
+        "x"          = 0
+        "y"          = 0
+        "width"      = 12
+        "height"     = 6
+        "properties" = {
+          "title"  = "Queue depth (visible messages)"
+          "stat"   = "Average"
+          "period" = 300
+          "metrics" = [
+            for idx, name in var.sqs_subscribers :
+            [
+              "AWS/SQS",
+              "ApproximateNumberOfMessagesVisible",
+              "QueueName",
+              aws_sqs_queue.processing[idx].name
+            ]
+          ]
+        }
+      },
+      {
+        "type"       = "metric"
+        "x"          = 12
+        "y"          = 0
+        "width"      = 12
+        "height"     = 6
+        "properties" = {
+          "title"  = "Parser latency"
+          "stat"   = "Average"
+          "period" = 300
+          "metrics" = [
+            for idx, name in var.sqs_subscribers :
+            [
+              var.cloudwatch_namespace,
+              "ParserLatencyMs",
+              "QueueName",
+              aws_sqs_queue.processing[idx].name
+            ]
+          ]
+        }
+      },
+      {
+        "type"       = "metric"
+        "x"          = 0
+        "y"          = 6
+        "width"      = 24
+        "height"     = 6
+        "properties" = {
+          "title"  = "Parser success/failure"
+          "stat"   = "Sum"
+          "period" = 300
+          "metrics" = concat(
+            [
+              for idx, name in var.sqs_subscribers :
+              [
+                var.cloudwatch_namespace,
+                "ParserSuccess",
+                "QueueName",
+                aws_sqs_queue.processing[idx].name,
+                { "label" = "${name} success" }
+              ]
+            ],
+            [
+              for idx, name in var.sqs_subscribers :
+              [
+                var.cloudwatch_namespace,
+                "ParserFailure",
+                "QueueName",
+                aws_sqs_queue.processing[idx].name,
+                { "label" = "${name} failure" }
+              ]
+            ]
+          )
+        }
+      }
+    ]
+  })
+}
+
 variable "aws_region" {
   type        = string
   description = "AWS region for the deployment"
@@ -181,6 +339,24 @@ variable "sqs_message_retention_seconds" {
   type        = number
   description = "Retention period for processing queues"
   default     = 1209600
+}
+
+variable "cloudwatch_namespace" {
+  type        = string
+  description = "Namespace for custom CloudWatch metrics emitted by Databricks jobs"
+  default     = "DocumentProcessing"
+}
+
+variable "queue_depth_alarm_threshold" {
+  type        = number
+  description = "Threshold for SQS queue depth alarms"
+  default     = 100
+}
+
+variable "parser_failure_rate_threshold" {
+  type        = number
+  description = "Maximum acceptable parser failure ratio before raising an alarm"
+  default     = 0.2
 }
 
 variable "default_tags" {

@@ -8,6 +8,10 @@ Document routing, categorisation, and strategy selection live in the
 ``databricks.routing`` package, allowing the ingestion loop to orchestrate
 production-ready routing strategies without embedding the implementation
 directly in this module.
+
+In addition to orchestrating the ingestion flow, the module emits structured
+telemetry to Delta/MLflow and publishes CloudWatch metrics so operations teams
+can monitor queue depth, parser success rates, and latency.
 """
 
 import concurrent.futures
@@ -17,6 +21,7 @@ import logging
 import os
 import re
 import time
+import traceback
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Optional
 
@@ -43,6 +48,8 @@ from databricks.routing import (
     StrategyConfig,
     LayoutModelType,
 )
+
+from .observability import CloudWatchMetricsEmitter, StructuredEventLogger
 
 
 LOGGER = logging.getLogger(__name__)
@@ -79,6 +86,9 @@ class IngestionConfig:
     layout_model_secret_scope: Optional[str] = None
     layout_model_secret_key: Optional[str] = None
     layout_model_timeout_seconds: int = 60
+    observability_table: str = "lakehouse.raw_ingestion_events"
+    failure_table: str = "lakehouse.raw_ingestion_failures"
+    cloudwatch_namespace: Optional[str] = None
     layout_model_type: Optional[str] = None
 
 
@@ -110,6 +120,7 @@ def receive_message_batch(sqs_client, queue_url: str, config: IngestionConfig):
         WaitTimeSeconds=config.wait_time_seconds,
         VisibilityTimeout=config.visibility_timeout_buffer,
         MessageAttributeNames=["All"],
+        AttributeNames=["ApproximateReceiveCount"],
     )
     return response.get("Messages", [])
 
@@ -153,6 +164,20 @@ def persist_metadata(spark: SparkSession, metadata_table: str, records: List[dic
        .format("delta")
        .mode("append")
        .saveAsTable(metadata_table))
+
+
+def persist_failure_records(spark: SparkSession, table: str, records: List[dict]):
+    if not records:
+        return
+
+    df: DataFrame = spark.createDataFrame(records)
+    (
+        df.withColumn("failed_at", current_timestamp())
+        .write.format("delta")
+        .mode("append")
+        .option("mergeSchema", "true")
+        .saveAsTable(table)
+    )
 
 
 def _resolve_default_strategy_map(config: IngestionConfig) -> Dict[str, Dict[str, Optional[str]]]:
@@ -494,63 +519,219 @@ def process_messages(config: IngestionConfig):
     batches_processed = 0
     total_messages = 0
 
-    while True:
-        overrides = override_provider.load()
-        messages = receive_message_batch(sqs_client, config.queue_url, config)
-        if not messages:
-            time.sleep(config.poll_interval_seconds)
-            continue
+    batches_processed = 0
+    total_messages = 0
+    total_failures = 0
+    queue_name = config.queue_url.split("/")[-1]
+    metrics_emitter = (
+        CloudWatchMetricsEmitter(
+            namespace=config.cloudwatch_namespace,
+            region=config.region,
+            queue_name=queue_name,
+        )
+        if config.cloudwatch_namespace
+        else None
+    )
 
-        receipt_handles = [message["ReceiptHandle"] for message in messages]
-        message_payloads = [json.loads(message["Body"]) for message in messages]
+    def _queue_depth_snapshot():
+        try:
+            attributes = sqs_client.get_queue_attributes(
+                QueueUrl=config.queue_url,
+                AttributeNames=[
+                    "ApproximateNumberOfMessages",
+                    "ApproximateNumberOfMessagesNotVisible",
+                ],
+            ).get("Attributes", {})
+            visible = int(attributes.get("ApproximateNumberOfMessages", 0))
+            not_visible = int(attributes.get("ApproximateNumberOfMessagesNotVisible", 0))
+            if metrics_emitter:
+                metrics_emitter.emit_queue_depth(visible, not_visible)
+            return visible, not_visible
+        except Exception:
+            LOGGER.exception("Failed to retrieve queue depth snapshot for %s", config.queue_url)
+            return None, None
 
-        metadata_records: List[dict] = []
-        analyses: List[DocumentAnalysis] = []
-        routed_payload: List[dict] = []
-        for message, body in zip(messages, message_payloads):
-            object_key = _resolve_object_key(body)
-            if not object_key:
-                LOGGER.warning("Skipping message %s without object key", message["MessageId"])
+    with StructuredEventLogger(
+        spark=spark,
+        delta_table=config.observability_table,
+        job_name="sqs_batch_ingestion",
+        context={"queue_url": config.queue_url, "region": config.region},
+    ) as run_logger:
+        while True:
+            overrides = override_provider.load()
+            messages = receive_message_batch(sqs_client, config.queue_url, config)
+            visible_depth, inflight_depth = _queue_depth_snapshot()
+            if not messages:
+                run_logger.log_event(
+                    "poll_idle",
+                    status="idle",
+                    queue_depth=visible_depth,
+                    inflight=inflight_depth,
+                )
+                time.sleep(config.poll_interval_seconds)
                 continue
-            base_record = {
-                "source_path": object_key,
-                "file_type": os.path.splitext(object_key or "")[1].lstrip("."),
-                "message_id": message["MessageId"],
-                "sns_topic": body.get("TopicArn"),
-                "queue_url": config.queue_url,
-            }
 
-            analysis = router.route(body, object_key, overrides)
-            analyses.append(analysis)
-            metadata_records.append(analysis.to_metadata_record(base_record))
-            routed_payload.append(body)
+            metadata_records: List[dict] = []
+            analyses: List[DocumentAnalysis] = []
+            routed_payload: List[dict] = []
+            failure_records: List[dict] = []
+            success_receipts: List[str] = []
+            batch_failures = 0
+            batch_start = time.time()
 
-        persist_metadata(spark, config.metadata_table, metadata_records)
+            for message in messages:
+                message_id = message.get("MessageId")
+                receive_count = int(message.get("Attributes", {}).get("ApproximateReceiveCount", "1"))
+                try:
+                    body = json.loads(message["Body"])
+                except json.JSONDecodeError as exc:
+                    LOGGER.exception("Invalid JSON payload for message %s", message_id)
+                    failure_records.append(
+                        {
+                            "message_id": message_id,
+                            "queue_url": config.queue_url,
+                            "failure_reason": "invalid_json",
+                            "error_message": str(exc),
+                            "stacktrace": traceback.format_exc(),
+                            "receive_count": receive_count,
+                        }
+                    )
+                    batch_failures += 1
+                    total_failures += 1
+                    if metrics_emitter:
+                        metrics_emitter.emit_processing_failure()
+                    run_logger.log_event(
+                        "message_failed",
+                        status="failed",
+                        message_id=message_id,
+                        failure_reason="invalid_json",
+                        receive_count=receive_count,
+                    )
+                    continue
 
-        if config.routing_metadata_table:
-            routing_records = [_routing_record_from_analysis(analysis) for analysis in analyses]
-            persist_metadata(spark, config.routing_metadata_table, routing_records)
+                object_key = _resolve_object_key(body)
+                if not object_key:
+                    LOGGER.warning("Skipping message %s without object key", message_id)
+                    failure_records.append(
+                        {
+                            "message_id": message_id,
+                            "queue_url": config.queue_url,
+                            "failure_reason": "missing_object_key",
+                            "error_message": "Payload missing object key",
+                            "stacktrace": None,
+                            "receive_count": receive_count,
+                        }
+                    )
+                    batch_failures += 1
+                    total_failures += 1
+                    if metrics_emitter:
+                        metrics_emitter.emit_processing_failure()
+                    run_logger.log_event(
+                        "message_failed",
+                        status="failed",
+                        message_id=message_id,
+                        failure_reason="missing_object_key",
+                        receive_count=receive_count,
+                    )
+                    continue
 
-        if config.dispatch_job_id and routed_payload:
-            dispatch_to_worker(
-                config.dispatch_job_id,
-                routed_payload,
-                task_parameters=config.worker_task_parameters,
+                base_record = {
+                    "source_path": object_key,
+                    "file_type": os.path.splitext(object_key or "")[1].lstrip("."),
+                    "message_id": message_id,
+                    "sns_topic": body.get("TopicArn"),
+                    "queue_url": config.queue_url,
+                }
+
+                start = time.time()
+                try:
+                    analysis = router.route(body, object_key, overrides)
+                except Exception as exc:
+                    LOGGER.exception("Failed to route message %s", message_id)
+                    failure_records.append(
+                        {
+                            "message_id": message_id,
+                            "queue_url": config.queue_url,
+                            "failure_reason": "routing_error",
+                            "error_message": str(exc),
+                            "stacktrace": traceback.format_exc(),
+                            "receive_count": receive_count,
+                            "source_path": object_key,
+                        }
+                    )
+                    batch_failures += 1
+                    total_failures += 1
+                    if metrics_emitter:
+                        metrics_emitter.emit_processing_failure()
+                    run_logger.log_event(
+                        "message_failed",
+                        status="failed",
+                        message_id=message_id,
+                        failure_reason="routing_error",
+                        receive_count=receive_count,
+                        object_key=object_key,
+                    )
+                    continue
+
+                duration_ms = int((time.time() - start) * 1000)
+                analyses.append(analysis)
+                metadata_records.append(analysis.to_metadata_record(base_record))
+                routed_payload.append(body)
+                success_receipts.append(message["ReceiptHandle"])
+                if metrics_emitter:
+                    metrics_emitter.emit_processing_success(latency_ms=duration_ms)
+                run_logger.log_event(
+                    "message_processed",
+                    status="succeeded",
+                    message_id=message_id,
+                    object_key=object_key,
+                    latency_ms=duration_ms,
+                    receive_count=receive_count,
+                )
+
+            persist_metadata(spark, config.metadata_table, metadata_records)
+
+            if config.routing_metadata_table and analyses:
+                routing_records = [_routing_record_from_analysis(analysis) for analysis in analyses]
+                persist_metadata(spark, config.routing_metadata_table, routing_records)
+
+            if failure_records:
+                persist_failure_records(spark, config.failure_table, failure_records)
+
+            if config.dispatch_job_id and routed_payload:
+                dispatch_to_worker(
+                    config.dispatch_job_id,
+                    routed_payload,
+                    task_parameters=config.worker_task_parameters,
+                )
+            elif not config.dispatch_job_id and routed_payload:
+                # Inline processing placeholder: replace with domain-specific logic.
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    list(executor.map(lambda body: body, routed_payload))
+
+            delete_messages(sqs_client, config.queue_url, success_receipts)
+
+            batches_processed += 1
+            total_messages += len(messages)
+            batch_duration_ms = int((time.time() - batch_start) * 1000)
+            run_logger.log_event(
+                "batch_processed",
+                status="completed",
+                batch_size=len(messages),
+                successes=len(success_receipts),
+                failures=batch_failures,
+                queue_depth=visible_depth,
+                inflight=inflight_depth,
+                duration_ms=batch_duration_ms,
             )
-        elif not config.dispatch_job_id and routed_payload:
-            # Inline processing placeholder: replace with domain-specific logic.
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                list(executor.map(lambda body: body, routed_payload))
 
-        delete_messages(sqs_client, config.queue_url, receipt_handles)
+            if config.max_batches and batches_processed >= config.max_batches:
+                break
 
-        batches_processed += 1
-        total_messages += len(messages)
-
-        if config.max_batches and batches_processed >= config.max_batches:
-            break
-
-    spark.createDataFrame([(total_messages, batches_processed)], ["messages", "batches"]).withColumn(
+    spark.createDataFrame(
+        [(total_messages, batches_processed, total_failures)],
+        ["messages", "batches", "failures"],
+    ).withColumn(
         "queue_url", lit(config.queue_url)
     ).withColumn(
         "completed_at", current_timestamp()
@@ -584,6 +765,9 @@ if __name__ == "__main__":
         layout_model_secret_scope=os.environ.get("LAYOUT_MODEL_SECRET_SCOPE"),
         layout_model_secret_key=os.environ.get("LAYOUT_MODEL_SECRET_KEY"),
         layout_model_timeout_seconds=int(os.environ.get("LAYOUT_MODEL_TIMEOUT_SECONDS", "60")),
+        observability_table=os.environ.get("OBSERVABILITY_TABLE", "lakehouse.raw_ingestion_events"),
+        failure_table=os.environ.get("FAILURE_TABLE", "lakehouse.raw_ingestion_failures"),
+        cloudwatch_namespace=os.environ.get("CLOUDWATCH_NAMESPACE"),
     )
 
     process_messages(config)
