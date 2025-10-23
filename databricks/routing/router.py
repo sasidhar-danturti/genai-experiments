@@ -1,10 +1,12 @@
 import base64
 import binascii
+import io
 import json
 import logging
 import mimetypes
 import re
 import statistics
+import zipfile
 from dataclasses import dataclass, field
 from email import message_from_bytes
 from email.message import Message
@@ -25,6 +27,17 @@ except ImportError:  # pragma: no cover - optional dependency
     PDF_WIDGET_TYPE_RADIOBUTTON = None
 
 logger = logging.getLogger(__name__)
+
+
+_INLINE_PAYLOAD_KEYS = (
+    "documentBytes",
+    "document_bytes",
+    "documentContent",
+    "document_content",
+    "payload",
+)
+
+_INLINE_METADATA_KEYS = ("inlineContent", "inline_content")
 
 
 class RoutingMode(str, Enum):
@@ -211,6 +224,41 @@ class DocumentDescriptor:
         return None
 
 
+def _coerce_bytes(value: object) -> Optional[bytes]:
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, str):
+        try:
+            return base64.b64decode(value, validate=True)
+        except (ValueError, binascii.Error):  # type: ignore[name-defined]
+            try:
+                return value.encode("utf-8")
+            except Exception:
+                return None
+    return None
+
+
+def _extract_inline_bytes(body: object) -> Optional[bytes]:
+    if not isinstance(body, dict):
+        return None
+
+    for key in _INLINE_PAYLOAD_KEYS:
+        if key in body and body[key]:
+            payload_bytes = _coerce_bytes(body[key])
+            if payload_bytes:
+                return payload_bytes
+
+    metadata = body.get("documentMetadata")
+    if isinstance(metadata, dict):
+        for inline_key in _INLINE_METADATA_KEYS:
+            inline_payload = metadata.get(inline_key)
+            if inline_payload:
+                payload_bytes = _coerce_bytes(inline_payload)
+                if payload_bytes:
+                    return payload_bytes
+    return None
+
+
 class ContentResolver(Protocol):
     """Resolves raw document content for analysis."""
 
@@ -221,48 +269,11 @@ class ContentResolver(Protocol):
 class InlineDocumentContentResolver:
     """Retrieves base64-encoded or inline binary payloads from the message body."""
 
-    INLINE_KEYS = (
-        "documentBytes",
-        "document_bytes",
-        "documentContent",
-        "document_content",
-        "payload",
-    )
+    INLINE_KEYS = _INLINE_PAYLOAD_KEYS
 
     def fetch(self, descriptor: DocumentDescriptor) -> Optional[bytes]:
         body = descriptor.body
-        if not isinstance(body, dict):
-            return None
-
-        for key in self.INLINE_KEYS:
-            if key in body and body[key]:
-                raw_value = body[key]
-                if isinstance(raw_value, bytes):
-                    return raw_value
-                if isinstance(raw_value, str):
-                    try:
-                        return base64.b64decode(raw_value, validate=True)
-                    except (ValueError, binascii.Error):  # type: ignore[name-defined]
-                        try:
-                            return raw_value.encode("utf-8")
-                        except Exception:
-                            continue
-
-        metadata = body.get("documentMetadata") if isinstance(body, dict) else None
-        if isinstance(metadata, dict):
-            inline_payload = metadata.get("inlineContent") or metadata.get("inline_content")
-            if inline_payload:
-                if isinstance(inline_payload, bytes):
-                    return inline_payload
-                if isinstance(inline_payload, str):
-                    try:
-                        return base64.b64decode(inline_payload, validate=True)
-                    except (ValueError, binascii.Error):  # type: ignore[name-defined]
-                        try:
-                            return inline_payload.encode("utf-8")
-                        except Exception:
-                            return None
-        return None
+        return _extract_inline_bytes(body)
 
 
 class LayoutAnalyser(Protocol):
@@ -1048,8 +1059,63 @@ def _sniff_mime_type(object_key: str, body: dict) -> str:
     if mime_type:
         return str(mime_type)
 
+    inline_bytes = _extract_inline_bytes(body)
+    if inline_bytes:
+        detected = _detect_mime_from_bytes(inline_bytes)
+        if detected:
+            return detected
+
     guessed, _ = mimetypes.guess_type(object_key)
     return guessed or "application/octet-stream"
+
+
+def _detect_mime_from_bytes(data: bytes) -> Optional[str]:
+    if not data:
+        return None
+
+    header = data[:8]
+    if header.startswith(b"%PDF-"):
+        return "application/pdf"
+
+    if header.startswith(b"\xD0\xCF\x11\xE0"):
+        return "application/msword"
+
+    if header.startswith(b"PK\x03\x04"):
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                names = archive.namelist()
+        except (zipfile.BadZipFile, RuntimeError):
+            return "application/zip"
+
+        name_set = {name.lower() for name in names}
+        if any(name.startswith("word/") for name in name_set):
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        if any(name.startswith("ppt/") for name in name_set):
+            return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        if any(name.startswith("xl/") for name in name_set):
+            return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        return "application/zip"
+
+    try:
+        snippet = data[:2048].decode("utf-8", errors="ignore").strip()
+    except Exception:
+        snippet = ""
+
+    lowered = snippet.lower()
+    if lowered.startswith("<!doctype html") or lowered.startswith("<html") or "<html" in lowered[:200]:
+        return "text/html"
+    if lowered.startswith("<?xml"):
+        return "application/xml"
+    if lowered.startswith("from:") or lowered.startswith("received:"):
+        return "message/rfc822"
+
+    sample = data[:128]
+    if sample:
+        ascii_like = sum(1 for byte in sample if 32 <= byte <= 126 or byte in {9, 10, 13}) / len(sample)
+        if ascii_like > 0.9:
+            return "text/plain"
+
+    return None
 
 
 def _safe_float(*values: object, default: float = 0.0) -> float:

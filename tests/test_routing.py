@@ -1,5 +1,8 @@
+import base64
+import io
 import re
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -20,6 +23,7 @@ from databricks.routing.router import (
     _EmailHTMLMetricsParser,
     _build_profile,
     DocumentDescriptor,
+    _sniff_mime_type,
 )
 
 
@@ -177,3 +181,30 @@ def test_document_router_uses_fallback_when_table_pages_exceed_threshold():
     assert "threshold_redirect" in analysis.overrides_applied
     assert analysis.total_tables == 5
     assert analysis.table_page_ratio == 1
+
+
+def test_sniff_mime_type_detects_pdf_from_inline_payload():
+    payload = base64.b64encode(b"%PDF-1.7\n...").decode("ascii")
+    body = {"documentBytes": payload}
+
+    assert _sniff_mime_type("unknown.bin", body) == "application/pdf"
+
+
+def test_sniff_mime_type_detects_docx_package():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w") as archive:
+        archive.writestr("[Content_Types].xml", "<Types></Types>")
+        archive.writestr("word/document.xml", "<w:document></w:document>")
+    body = {"payload": base64.b64encode(buffer.getvalue()).decode("ascii")}
+
+    assert (
+        _sniff_mime_type("submission.bin", body)
+        == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+
+
+def test_sniff_mime_type_detects_html_snippets():
+    html_bytes = b"<!doctype html><html><body>test</body></html>"
+    body = {"document_content": base64.b64encode(html_bytes).decode("ascii")}
+
+    assert _sniff_mime_type("page.dat", body) == "text/html"
