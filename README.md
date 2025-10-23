@@ -12,7 +12,7 @@ into Databricks for downstream processing.
    DLQ) so individual workloads can process distinct streams. A CloudFormation
    alternative is available at `infrastructure/aws/cloud_storage_ingestion.yaml`
    if you prefer YAML-based stacks over Terraform.
-2. **Databricks polling job** – `databricks/sqs_batch_ingestion.py` is a Python
+2. **Databricks polling job** – `idp_service/sqs_batch_ingestion.py` is a Python
    notebook/script that can be scheduled as a Databricks Job. It performs batch
    pulls from SQS, optionally dispatches work units to dedicated worker
    clusters via the Jobs API, and records every message in Delta tables for

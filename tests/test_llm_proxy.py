@@ -1,4 +1,4 @@
-from databricks.llm_document_intelligence_proxy import LLMAzureDocumentIntelligenceClient
+from idp_service.llm_document_intelligence_proxy import LLMAzureDocumentIntelligenceClient
 from parsers.adapters.azure_document_intelligence import AzureDocumentIntelligenceAdapter
 
 

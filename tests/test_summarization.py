@@ -1,7 +1,7 @@
 import json
 
 from parsers.canonical_schema import CanonicalDocument, CanonicalTextSpan
-from databricks.summarization import DefaultDocumentSummarizer
+from idp_service.summarization import DefaultDocumentSummarizer
 
 
 class _FakeAzureClient:
