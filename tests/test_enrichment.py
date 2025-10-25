@@ -4,7 +4,7 @@ from pathlib import Path
 # Allow tests to import the project packages without installation.
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from databricks.enrichment import EnrichmentDispatcher, EnrichmentResponse  # noqa: E402
+from idp_service.enrichment import EnrichmentDispatcher, EnrichmentResponse  # noqa: E402
 from parsers.canonical_schema import (  # noqa: E402
     CanonicalDocument,
 )

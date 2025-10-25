@@ -12,7 +12,7 @@ into Databricks for downstream processing.
    DLQ) so individual workloads can process distinct streams. A CloudFormation
    alternative is available at `infrastructure/aws/cloud_storage_ingestion.yaml`
    if you prefer YAML-based stacks over Terraform.
-2. **Databricks polling job** – `databricks/sqs_batch_ingestion.py` is a Python
+2. **Databricks polling job** – `idp_service/sqs_batch_ingestion.py` is a Python
    notebook/script that can be scheduled as a Databricks Job. It performs batch
    pulls from SQS, optionally dispatches work units to dedicated worker
    clusters via the Jobs API, and records every message in Delta tables for
@@ -25,6 +25,9 @@ into Databricks for downstream processing.
    by DynamoDB, and results stream from Databricks SQL, all while returning the
    canonical schema described in `parsers/canonical_schema.py`.
 
+   For a walkthrough of the IDP pipeline design and how the pieces fit
+   together, see [`docs/idp_service_architecture.md`](docs/idp_service_architecture.md).
+
 ### Usage notes
 
 - Customize Terraform variables (`bucket_name`, `sqs_subscribers`, etc.) to fit
@@ -34,6 +37,8 @@ into Databricks for downstream processing.
 - Execute the SQL script in a Databricks SQL warehouse or notebook to create
   the tracking tables before running the job.
 - Review `docs/runbooks/document_processing_api.md` for the API contract,
+- Run `notebooks/idp_production_simulation.ipynb` to rehearse the end-to-end flow with production-style configuration TODOs and simulated SQS batches before wiring up live services.
+- Run `notebooks/idp_validation_suite.ipynb` to validate routing overrides, enrichment hooks, and idempotent persistence across sample documents before deploying changes.
   deployment runbook, and IAM references.
 - Integrate against the API using the helper in
   `clients/document_processing_client.py`, which demonstrates submission,
