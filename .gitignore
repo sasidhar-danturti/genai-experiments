@@ -1,0 +1,4 @@
+
+# Ignore generated sample documents
+docs/sample_documents/*
+!docs/sample_documents/README.md

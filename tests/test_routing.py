@@ -10,7 +10,7 @@ import pytest
 # Allow tests to import the routing package without installing it.
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from databricks.routing.router import (
+from idp_service.routing.router import (
     DocumentCategory,
     DocumentRouter,
     HeuristicLayoutAnalyser,

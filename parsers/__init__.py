@@ -14,6 +14,18 @@ from .canonical_schema import (
     StructuredField,
     VisualDescription,
 )
+from .denormalized import (
+    BlockRow,
+    BlockType,
+    DenormRecord,
+    DocRow,
+    InsightKind,
+    InsightRow,
+    PageRow,
+    Status,
+    Units,
+    canonical_to_denorm_records,
+)
 
 __all__ = [
     "BoundingRegion",
@@ -28,4 +40,14 @@ __all__ = [
     "PageSegment",
     "StructuredField",
     "VisualDescription",
+    "BlockRow",
+    "BlockType",
+    "DenormRecord",
+    "DocRow",
+    "InsightKind",
+    "InsightRow",
+    "PageRow",
+    "Status",
+    "Units",
+    "canonical_to_denorm_records",
 ]

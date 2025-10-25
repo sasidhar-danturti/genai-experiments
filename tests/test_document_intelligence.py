@@ -1,4 +1,5 @@
 import sys
+from email.message import EmailMessage
 from pathlib import Path
 
 import pytest
@@ -6,13 +7,16 @@ import pytest
 # Allow tests to import the project packages without installation.
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from databricks.document_intelligence_workflow import (  # noqa: E402
+from idp_service.document_intelligence_workflow import (  # noqa: E402
     DocumentIntelligenceWorkflow,
     WorkflowConfig,
 )
-from databricks.enrichment import EnrichmentResponse  # noqa: E402
-from databricks.document_intelligence_storage import (  # noqa: E402
+from idp_service.enrichment import EnrichmentResponse  # noqa: E402
+from idp_service.document_intelligence_storage import (  # noqa: E402
     InMemoryDocumentResultStore,
+)
+from idp_service.llm_document_intelligence_proxy import (  # noqa: E402
+    LLMAzureDocumentIntelligenceClient,
 )
 from parsers.adapters.azure_document_intelligence import (  # noqa: E402
     AzureDocumentIntelligenceAdapter,
@@ -21,6 +25,7 @@ from parsers.adapters.databricks_llm_image import DatabricksLLMImageAdapter  # n
 from parsers.adapters.email_parser import EmailParserAdapter  # noqa: E402
 from parsers.adapters.multi_parser import MultiParserAdapter  # noqa: E402
 from parsers.adapters.pymupdf import PyMuPDFAdapter  # noqa: E402
+from parsers import BlockRow, DocRow, InsightRow
 
 
 class _FakePoller:
@@ -170,6 +175,9 @@ def test_workflow_is_idempotent_and_supports_force(sample_analyze_result):
     assert result.document.summaries[0].method == "heuristic_leading_sentences"
     assert len(client.calls) == 1
     assert client.calls[0][2]["pages"] == [1]
+    assert result.records
+    assert isinstance(result.records[0], DocRow)
+    assert all(row.bundle_id == "doc-1" for row in result.records)
 
     skipped = workflow.process(
         document_id="doc-1",
@@ -180,6 +188,7 @@ def test_workflow_is_idempotent_and_supports_force(sample_analyze_result):
     )
 
     assert skipped.skipped
+    assert skipped.records == []
     assert len(client.calls) == 1
 
     forced = workflow.process(
@@ -192,6 +201,7 @@ def test_workflow_is_idempotent_and_supports_force(sample_analyze_result):
     )
 
     assert not forced.skipped
+    assert forced.records
     assert len(client.calls) == 2
 
 
@@ -212,6 +222,7 @@ def test_workflow_retries_on_transient_failures(sample_analyze_result, monkeypat
     )
 
     assert not result.skipped
+    assert result.records
     assert len(client.calls) == 2
 
 
@@ -413,6 +424,41 @@ def test_workflow_triggers_enrichment_when_requested(sample_analyze_result):
     assert enrichment.enrichment_type == "keywords"
     assert enrichment.provider == provider.name
     assert enrichment.confidence == pytest.approx(provider.confidence)
+    assert any(isinstance(row, InsightRow) for row in result.records)
 
     persisted = store._records[(result.document.document_id, result.document.checksum)]
     assert persisted.enrichments
+
+
+def test_workflow_parses_email_attachments_into_denorm_records():
+    client = LLMAzureDocumentIntelligenceClient()
+    store = InMemoryDocumentResultStore()
+    config = WorkflowConfig(model_id="general-document")
+    workflow = DocumentIntelligenceWorkflow(client=client, store=store, config=config)
+
+    message = EmailMessage()
+    message["Subject"] = "Report"
+    message["From"] = "sender@example.com"
+    message["To"] = "recipient@example.com"
+    message.set_content("Body text with attachment")
+    message.add_attachment(
+        "Attachment body".encode("utf-8"),
+        maintype="text",
+        subtype="plain",
+        filename="note.txt",
+    )
+
+    result = workflow.process(
+        document_id="email-doc",
+        document_bytes=message.as_bytes(),
+        source_uri="imap://mailbox/1",
+        metadata={"mime_type": "message/rfc822"},
+    )
+
+    assert result.document is not None
+    assert result.document.attachments
+    attachment = result.document.attachments[0]
+    assert attachment.file_name == "note.txt"
+    assert attachment.document is not None
+    assert any(isinstance(row, DocRow) and row.part_id == "root.attachment-1" for row in result.records)
+    assert any(isinstance(row, BlockRow) and row.part_id == "root.attachment-1" for row in result.records)
