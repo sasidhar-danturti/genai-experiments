@@ -6,10 +6,18 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
+from email import message_from_bytes
+from email.message import Message
 from typing import Any, Dict, Iterable, List, Optional, Protocol, Sequence
 
 from parsers.adapters import AzureDocumentIntelligenceAdapter, ParserAdapter
-from parsers.canonical_schema import CanonicalDocument, DocumentEnrichment
+from parsers.canonical_schema import (
+    CanonicalDocument,
+    DocumentAttachment,
+    DocumentEnrichment,
+)
+from parsers.denormalized import canonical_to_denorm_records, DenormRecord
 from .enrichment import EnrichmentDispatcher, EnrichmentProvider
 from .summarization import DefaultDocumentSummarizer, DocumentSummarizer
 
@@ -86,6 +94,7 @@ class WorkflowResult:
 
     document: Optional[CanonicalDocument]
     skipped: bool
+    records: List[DenormRecord] = field(default_factory=list)
 
 
 class DocumentIntelligenceWorkflow:
@@ -126,7 +135,7 @@ class DocumentIntelligenceWorkflow:
 
         if not force and self._store.has_record(document_id, checksum):
             logger.info("Skipping document because an identical payload already exists", extra={"document_id": document_id})
-            return WorkflowResult(document=None, skipped=True)
+            return WorkflowResult(document=None, skipped=True, records=[])
 
         analyze_result = self._service.analyze(
             document_bytes,
@@ -139,6 +148,13 @@ class DocumentIntelligenceWorkflow:
             document_id=document_id,
             source_uri=source_uri,
             checksum=checksum,
+            metadata=metadata,
+        )
+
+        canonical = self._attach_email_children(
+            canonical,
+            document_bytes=document_bytes,
+            source_uri=source_uri,
             metadata=metadata,
         )
 
@@ -166,7 +182,104 @@ class DocumentIntelligenceWorkflow:
                     )
 
         self._store.save(canonical)
-        return WorkflowResult(document=canonical, skipped=False)
+        records = canonical_to_denorm_records(
+            canonical,
+            request_id=str(metadata.get("request_id", document_id)),
+            generated_at=datetime.now(timezone.utc),
+        )
+        return WorkflowResult(document=canonical, skipped=False, records=records)
+
+    # ------------------------------------------------------------------
+    # Attachment handling
+    # ------------------------------------------------------------------
+
+    def _attach_email_children(
+        self,
+        canonical: CanonicalDocument,
+        *,
+        document_bytes: bytes,
+        source_uri: str,
+        metadata: Dict[str, Any],
+        depth: int = 0,
+    ) -> CanonicalDocument:
+        if canonical.attachments or depth > 3:
+            return canonical
+
+        mime_type = (metadata.get("mime_type") or canonical.mime_type or "").lower()
+        if not mime_type.startswith("message/"):
+            return canonical
+
+        try:
+            message = message_from_bytes(document_bytes)
+        except Exception:  # pragma: no cover - defensive
+            logger.warning("Unable to parse email payload for attachments", exc_info=True)
+            return canonical
+
+        if not isinstance(message, Message):
+            return canonical
+
+        attachments: List[DocumentAttachment] = []
+        for index, part in enumerate(message.walk()):
+            if part.get_content_disposition() != "attachment":
+                continue
+            payload = part.get_payload(decode=True) or b""
+            if not payload:
+                continue
+
+            attachment_filename = part.get_filename() or f"attachment-{index + 1}"
+            attachment_mime = part.get_content_type() or "application/octet-stream"
+            attachment_checksum = _checksum(payload)
+            attachment_document_id = f"{canonical.document_id}::attachment-{index + 1}"
+            attachment_source = f"{source_uri}#attachment/{attachment_filename}"
+
+            attachment_metadata: Dict[str, Any] = {
+                "mime_type": attachment_mime,
+                "parent_document_id": canonical.document_id,
+                "attachment_file_name": attachment_filename,
+                "content_id": part.get("Content-ID"),
+            }
+
+            analyze_result = self._service.analyze(
+                payload,
+                content_type=attachment_mime,
+            )
+
+            attachment_document = self._adapter.transform(
+                analyze_result,
+                document_id=attachment_document_id,
+                source_uri=attachment_source,
+                checksum=attachment_checksum,
+                metadata=attachment_metadata,
+            )
+
+            if attachment_mime.startswith("message/"):
+                attachment_document = self._attach_email_children(
+                    attachment_document,
+                    document_bytes=payload,
+                    source_uri=attachment_source,
+                    metadata=attachment_metadata,
+                    depth=depth + 1,
+                )
+
+            attachments.append(
+                DocumentAttachment(
+                    attachment_id=str(index + 1),
+                    file_name=attachment_filename,
+                    mime_type=attachment_mime,
+                    checksum=attachment_checksum,
+                    source_uri=attachment_source,
+                    document=attachment_document,
+                    metadata={
+                        "size_bytes": len(payload),
+                        "content_id": part.get("Content-ID"),
+                    },
+                )
+            )
+
+        if not attachments:
+            return canonical
+
+        return replace(canonical, attachments=list(canonical.attachments) + attachments)
 
 
 def _checksum(payload: bytes) -> str:
