@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Document Review Console{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
+    <style>
+      body {
+        background: #f5f7fb;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .payload-panel {
+        max-height: 30rem;
+        overflow: auto;
+        background: #fff;
+        border: 1px solid #d3d9e2;
+        border-radius: 6px;
+        padding: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar is-white" role="navigation">
+      <div class="navbar-brand">
+        <a class="navbar-item" href="{{ url_for('home') }}">
+          <strong>Document Review Console</strong>
+        </a>
+      </div>
+      <div class="navbar-menu">
+        <div class="navbar-end">
+          {% if current_identity %}
+          <div class="navbar-item">
+            <div class="has-text-right">
+              <div class="is-size-6">{{ current_identity.username }}</div>
+              {% if current_identity.email %}
+              <div class="is-size-7 has-text-grey">{{ current_identity.email }}</div>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </nav>
+
+    <section class="section">
+      <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="mb-5">
+          {% for category, message in messages %}
+          <div class="notification is-{{ 'danger' if category == 'error' else category }}">
+            {{ message }}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </div>
+    </section>
+  </body>
+</html>

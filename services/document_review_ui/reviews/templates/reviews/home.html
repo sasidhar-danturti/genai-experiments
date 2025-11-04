@@ -1,0 +1,93 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+  <h1>Document review queue</h1>
+  {% if messages %}
+  <div class="mt-2">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <form class="form-inline mb-3" method="get">
+    <div class="form-group mr-2">
+      <label for="trigger">Trigger</label>
+      <select name="trigger" id="trigger" class="form-control ml-2">
+        <option value="">All</option>
+        {% for value, label in trigger_choices %}
+        <option value="{{ value }}" {% if request.GET.trigger == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group mr-2">
+      <label for="status">Status</label>
+      <select name="status" id="status" class="form-control ml-2">
+        <option value="">All</option>
+        {% for value, label in status_choices %}
+        <option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group mr-2">
+      <label for="assignee">Assignee</label>
+      <select name="assignee" id="assignee" class="form-control ml-2">
+        <option value="">All</option>
+        <option value="me" {% if request.GET.assignee == "me" %}selected{% endif %}>Assigned to me</option>
+        <option value="unassigned" {% if request.GET.assignee == "unassigned" %}selected{% endif %}>Unassigned</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Filter</button>
+  </form>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Document ID</th>
+        <th>Title</th>
+        <th>Trigger</th>
+        <th>Status</th>
+        <th>Outcome</th>
+        <th>Assignee</th>
+        <th>Last reviewed</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for review in reviews %}
+      <tr>
+        <td>{{ review.document_id }}</td>
+        <td>{{ review.title }}</td>
+        <td>{{ review.get_trigger_display }}</td>
+        <td>{{ review.get_status_display }}</td>
+        <td>{% if review.outcome %}{{ review.get_outcome_display }}{% else %}—{% endif %}</td>
+        <td>{% if review.assigned_to %}{{ review.assigned_to.get_full_name|default:review.assigned_to.username }}{% else %}<span class="text-danger">Unassigned</span>{% endif %}</td>
+        <td>{% if review.latest_reviewed_at %}{{ review.latest_reviewed_at }}{% else %}—{% endif %}</td>
+        <td><a class="btn btn-sm btn-secondary" href="{% url 'reviews:document-detail' review.document_id %}">Open</a></td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8" class="text-center">No documents awaiting review.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if is_paginated %}
+  <nav aria-label="Review pagination">
+    <ul class="pagination">
+      {% if page_obj.has_previous %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">Previous</span></li>
+      {% endif %}
+      <li class="page-item active"><span class="page-link">Page {{ page_obj.number }} of {{ paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">Next</span></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

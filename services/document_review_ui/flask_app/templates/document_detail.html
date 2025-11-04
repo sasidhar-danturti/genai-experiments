@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Review {{ review.document_id }}{% endblock %}
+{% block content %}
+<div class="columns">
+  <div class="column is-two-thirds">
+    <div class="box">
+      <h2 class="title is-4">Canonical payload</h2>
+      <pre class="payload-panel">{{ review.canonical_document|pretty_json|safe }}</pre>
+    </div>
+    {% if review.standardized_output %}
+    <div class="box">
+      <h2 class="title is-4">Standardised output</h2>
+      <pre class="payload-panel">{{ review.standardized_output|pretty_json|safe }}</pre>
+    </div>
+    {% endif %}
+    {% if review.insights %}
+    <div class="box">
+      <h2 class="title is-4">Insights</h2>
+      <pre class="payload-panel">{{ review.insights|pretty_json|safe }}</pre>
+    </div>
+    {% endif %}
+  </div>
+  <div class="column">
+    <div class="box">
+      <h2 class="title is-5">Review metadata</h2>
+      <p><strong>Trigger:</strong> {{ review.get_trigger_display() }}</p>
+      <p><strong>Status:</strong> {{ review.get_status_display() }}</p>
+      <p><strong>Outcome:</strong> {{ review.get_outcome_display()|default('—') }}</p>
+      <p><strong>Job ID:</strong> {{ review.job_id|default('—') }}</p>
+      <p><strong>Assigned:</strong>
+        {% if review.assigned_to %}
+        {{ review.assigned_to.get_full_name()|default(review.assigned_to.username, true) }}
+        {% else %}
+        <span class="tag is-warning">Unassigned</span>
+        {% endif %}
+      </p>
+      <p><strong>Last updated:</strong> {{ review.updated_at }}</p>
+      <form method="post" action="{{ url_for('assign_review', review_id=review.id) }}" class="mt-3">
+        <div class="buttons">
+          <button class="button is-primary" type="submit" name="action" value="self">Assign to me</button>
+          <button class="button" type="submit" name="action" value="unassign">Return to queue</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="box">
+      <h2 class="title is-5">Complete review</h2>
+      <form method="post" action="{{ url_for('complete_review', review_id=review.id) }}">
+        <div class="field">
+          <label class="label">Outcome</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select name="outcome" required>
+                <option value="">Select outcome…</option>
+                {% for value, label in outcome_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Reviewed canonical document (JSON)</label>
+          <div class="control">
+            <textarea class="textarea" name="reviewed_canonical_document" rows="6" placeholder="Leave blank to keep the original payload."></textarea>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Reviewed standardised output (JSON)</label>
+          <div class="control">
+            <textarea class="textarea" name="reviewed_standardized_output" rows="6" placeholder="Optional"></textarea>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Reviewed insights (JSON)</label>
+          <div class="control">
+            <textarea class="textarea" name="reviewed_insights" rows="4" placeholder="Optional"></textarea>
+          </div>
+        </div>
+        <div class="field">
+          <button class="button is-success" type="submit">Dispatch reviewed document</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="box">
+      <h2 class="title is-5">Comments</h2>
+      <form method="post" action="{{ url_for('add_comment', review_id=review.id) }}">
+        <div class="field">
+          <label class="label">Comment</label>
+          <div class="control">
+            <textarea class="textarea" name="comment" rows="3" required></textarea>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Proposed changes (JSON, optional)</label>
+          <div class="control">
+            <textarea class="textarea" name="proposed_changes" rows="4"></textarea>
+          </div>
+        </div>
+        <div class="field">
+          <button class="button is-link" type="submit">Add comment</button>
+        </div>
+      </form>
+      <hr />
+      {% for comment in review.comments.all() %}
+      <article class="message">
+        <div class="message-header">
+          <p>{{ comment.author.get_full_name()|default(comment.author.username, true) }}</p>
+          <p>{{ comment.created_at }}</p>
+        </div>
+        <div class="message-body">
+          <p>{{ comment.comment }}</p>
+          {% if comment.proposed_changes %}
+          <details class="mt-2">
+            <summary>Proposed changes</summary>
+            <pre>{{ comment.proposed_changes|pretty_json|safe }}</pre>
+          </details>
+          {% endif %}
+        </div>
+      </article>
+      {% else %}
+      <p class="has-text-grey">No comments yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

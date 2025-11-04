@@ -1,0 +1,6 @@
+Flask>=2.3
+Django>=4.2
+# Optional dependencies for additional integrations
+psycopg2-binary>=2.9  # required when using the Redshift data source
+boto3>=1.28           # required when dispatching to SQS
+databricks-sql-connector>=2.9  # required when using the Databricks data source
