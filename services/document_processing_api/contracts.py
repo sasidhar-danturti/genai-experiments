@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import base64
 import json
-from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 from parsers.canonical_schema import SCHEMA_VERSION
 
@@ -36,8 +37,7 @@ class EnrichmentStatus(str, Enum):
     FAILED = "failed"
 
 
-@dataclass
-class NotificationConfig:
+class NotificationConfig(BaseModel):
     """Destinations that should be notified when processing completes."""
 
     sns_topic_arn: Optional[str] = None
@@ -53,8 +53,7 @@ class NotificationConfig:
         return payload
 
 
-@dataclass
-class SubmitJobRequest:
+class SubmitJobRequest(BaseModel):
     """Incoming payload for ``POST /jobs`` requests."""
 
     source_uri: str
@@ -62,7 +61,7 @@ class SubmitJobRequest:
     document_type: Optional[str] = None
     mime_type: Optional[str] = None
     priority: str = "normal"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     notification_config: Optional[NotificationConfig] = None
 
     @classmethod
@@ -112,8 +111,7 @@ class SubmitJobRequest:
         return payload
 
 
-@dataclass
-class SubmitJobResponse:
+class SubmitJobResponse(BaseModel):
     """Response body for ``POST /jobs``."""
 
     job_id: str
@@ -130,8 +128,7 @@ class SubmitJobResponse:
         }
 
 
-@dataclass
-class EnrichmentProgress:
+class EnrichmentProgress(BaseModel):
     """Status for individual enrichment pipelines."""
 
     name: str
@@ -151,8 +148,7 @@ class EnrichmentProgress:
         return payload
 
 
-@dataclass
-class JobStatusResponse:
+class JobStatusResponse(BaseModel):
     """Response payload for ``GET /jobs/{job_id}``."""
 
     job_id: str
@@ -160,7 +156,7 @@ class JobStatusResponse:
     submitted_at: datetime
     updated_at: datetime
     error: Optional[str] = None
-    enrichments: List[EnrichmentProgress] = field(default_factory=list)
+    enrichments: List[EnrichmentProgress] = Field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
@@ -176,8 +172,7 @@ class JobStatusResponse:
         return payload
 
 
-@dataclass
-class JobResultsResponse:
+class JobResultsResponse(BaseModel):
     """Payload returned by ``GET /jobs/{job_id}/results``."""
 
     job_id: str
@@ -196,8 +191,7 @@ class JobResultsResponse:
         return payload
 
 
-@dataclass
-class CompletionNotificationPayload:
+class CompletionNotificationPayload(BaseModel):
     """Event that is emitted when a job reaches a terminal state."""
 
     job_id: str
