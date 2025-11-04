@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, fields
 from datetime import datetime
 from enum import Enum
 from typing import Dict, Iterable, List, Optional, Tuple, Union
+
+try:  # pragma: no cover - allow either pydantic v1 or v2
+    from pydantic import BaseModel, ConfigDict
+except ImportError:  # pragma: no cover
+    from pydantic import BaseModel  # type: ignore
+
+    ConfigDict = None  # type: ignore
 
 from .canonical_schema import (
     BoundingRegion,
@@ -53,8 +59,7 @@ class InsightKind(str, Enum):
     QA = "qa"
 
 
-@dataclass
-class BaseRow:
+class BaseRow(BaseModel):
     schema_version: str = "1.0.0"
     request_id: str = ""
     bundle_id: str = ""
@@ -62,23 +67,21 @@ class BaseRow:
     page_number: Optional[int] = None
     generated_at: Optional[datetime] = None
 
+    if 'ConfigDict' in globals() and ConfigDict is not None:  # pragma: no branch
+        model_config = ConfigDict(use_enum_values=True)
+    else:  # pragma: no cover
+        class Config:
+            use_enum_values = True
+
     def to_dict(self) -> Dict[str, object]:
-        payload: Dict[str, object] = {}
-        for field_info in fields(self):
-            name = field_info.name
-            value = getattr(self, name)
-            if value is None:
-                continue
-            if isinstance(value, Enum):
-                payload[name] = value.value
-            elif isinstance(value, list):
-                payload[name] = [item for item in value]
-            else:
-                payload[name] = value
+        dump_args = {"exclude_none": True}
+        if hasattr(self, "model_dump"):
+            payload = self.model_dump(**dump_args)
+        else:  # pragma: no cover
+            payload = self.dict(**dump_args)
         return payload
 
 
-@dataclass
 class DocRow(BaseRow):
     record_level: str = "doc"
     doc_title: Optional[str] = None
@@ -92,7 +95,6 @@ class DocRow(BaseRow):
     insight_conf: Optional[float] = None
 
 
-@dataclass
 class PageRow(BaseRow):
     record_level: str = "page"
     page_number: int = 1
@@ -106,7 +108,6 @@ class PageRow(BaseRow):
     lang_detected: Optional[str] = None
 
 
-@dataclass
 class BlockRow(BaseRow):
     record_level: str = "block"
     page_number: int = 1
@@ -125,7 +126,6 @@ class BlockRow(BaseRow):
     kv_value: Optional[str] = None
 
 
-@dataclass
 class InsightRow(BaseRow):
     record_level: str = "insight"
     insight_kind: InsightKind = InsightKind.EXTRACTION

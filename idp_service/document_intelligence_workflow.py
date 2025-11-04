@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email import message_from_bytes
 from email.message import Message
@@ -161,9 +161,8 @@ class DocumentIntelligenceWorkflow:
         if self._summarizer is not None:
             summaries = self._summarizer.summarise(canonical)
             if summaries:
-                canonical = replace(
-                    canonical,
-                    summaries=list(canonical.summaries) + summaries,
+                canonical = canonical.model_copy(
+                    update={"summaries": list(canonical.summaries) + summaries}
                 )
 
         if self._enrichment_dispatcher is not None and enrich_with:
@@ -176,9 +175,8 @@ class DocumentIntelligenceWorkflow:
                     canonical.document_id, []
                 )
                 if enrichments:
-                    canonical = replace(
-                        canonical,
-                        enrichments=list(canonical.enrichments) + list(enrichments),
+                    canonical = canonical.model_copy(
+                        update={"enrichments": list(canonical.enrichments) + list(enrichments)}
                     )
 
         self._store.save(canonical)
@@ -279,7 +277,7 @@ class DocumentIntelligenceWorkflow:
         if not attachments:
             return canonical
 
-        return replace(canonical, attachments=list(canonical.attachments) + attachments)
+        return canonical.model_copy(update={"attachments": list(canonical.attachments) + attachments})
 
 
 def _checksum(payload: bytes) -> str:
