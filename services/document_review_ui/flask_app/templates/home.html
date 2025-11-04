@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Review Queue{% endblock %}
+{% block content %}
+<div class="level">
+  <div class="level-left">
+    <div>
+      <h1 class="title">Documents awaiting review</h1>
+      <p class="subtitle">Synchronised from canonical outputs and quality gates.</p>
+    </div>
+  </div>
+  <div class="level-right">
+    <form method="get" class="field has-addons">
+      <div class="control">
+        <div class="select">
+          <select name="status">
+            <option value="">All statuses</option>
+            {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if request.args.get('status') == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="control">
+        <div class="select">
+          <select name="trigger">
+            <option value="">All triggers</option>
+            {% for value, label in trigger_choices %}
+            <option value="{{ value }}" {% if request.args.get('trigger') == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="control">
+        <label class="checkbox mt-2 ml-3">
+          <input type="checkbox" name="mine" value="true" {% if request.args.get('mine') == 'true' %}checked{% endif %}>
+          Assigned to me
+        </label>
+      </div>
+      <div class="control">
+        <button class="button is-link" type="submit">Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="table-container">
+  <table class="table is-fullwidth is-hoverable">
+    <thead>
+      <tr>
+        <th>Document</th>
+        <th>Trigger</th>
+        <th>Status</th>
+        <th>Assigned to</th>
+        <th>Updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for review in reviews %}
+      <tr>
+        <td>
+          <a href="{{ url_for('review_detail', review_id=review.id) }}">{{ review.document_id }}</a>
+          {% if review.title %}<div class="has-text-grey is-size-7">{{ review.title }}</div>{% endif %}
+        </td>
+        <td>{{ review.get_trigger_display() }}</td>
+        <td>{{ review.get_status_display() }}</td>
+        <td>
+          {% if review.assigned_to %}
+          {{ review.assigned_to.get_full_name()|default(review.assigned_to.username, true) }}
+          {% else %}
+          <span class="tag is-warning">Unassigned</span>
+          {% endif %}
+        </td>
+        <td>{{ review.updated_at|default('—') }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="has-text-centered has-text-grey">No documents match the current filters.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div class="container">
+  <h1>Document {{ review.document_id }}</h1>
+  {% if messages %}
+  <div class="mt-2">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="mb-3">
+    <strong>Trigger:</strong> {{ review.get_trigger_display }}<br>
+    <strong>Status:</strong> {{ review.get_status_display }}<br>
+    <strong>Outcome:</strong> {{ review.get_outcome_display }}<br>
+    <strong>Assigned to:</strong> {% if review.assigned_to %}{{ review.assigned_to.get_full_name|default:review.assigned_to.username }}{% else %}<span class="text-danger">Unassigned</span>{% endif %}
+  </div>
+  <form method="post" action="{% url 'reviews:document-assign' review.document_id %}">
+    {% csrf_token %}
+    <button class="btn btn-sm btn-outline-primary" name="assign_to" value="self" type="submit">Assign to me</button>
+  </form>
+  <form method="post" action="{% url 'reviews:document-assign' review.document_id %}" class="mt-2">
+    {% csrf_token %}
+    {{ assignment_form.as_p }}
+    <button class="btn btn-sm btn-outline-secondary" type="submit">Assign</button>
+  </form>
+  <hr>
+  <h2>Canonical payload</h2>
+  <pre class="bg-light p-3">{{ canonical_pretty }}</pre>
+  {% if attachments %}
+  <h3>Attachments</h3>
+  <ul>
+    {% for attachment in attachments %}
+    <li>{{ attachment.file_name }} ({{ attachment.mime_type }}){% if attachment.source_uri %} - {{ attachment.source_uri }}{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if standardized_pretty %}
+  <h2>Standardized output</h2>
+  <pre class="bg-light p-3">{{ standardized_pretty }}</pre>
+  {% endif %}
+  {% if insights_pretty %}
+  <h2>Insights</h2>
+  <pre class="bg-light p-3">{{ insights_pretty }}</pre>
+  {% endif %}
+  <hr>
+  <h2>Complete review</h2>
+  <form method="post" action="{% url 'reviews:document-complete' review.document_id %}">
+    {% csrf_token %}
+    {{ completion_form.as_p }}
+    <button class="btn btn-success" type="submit">Submit review</button>
+  </form>
+  <hr>
+  <h2>Comments</h2>
+  <ul class="list-group mb-3">
+    {% for comment in review.comments.all %}
+    <li class="list-group-item">
+      <strong>{{ comment.author.get_full_name|default:comment.author.username }}</strong>
+      <span class="text-muted">{{ comment.created_at }}</span>
+      <p>{{ comment.comment }}</p>
+      {% if comment.proposed_changes %}
+      <pre class="bg-light p-2">{{ comment.proposed_changes }}</pre>
+      {% endif %}
+    </li>
+    {% empty %}
+    <li class="list-group-item">No comments yet.</li>
+    {% endfor %}
+  </ul>
+  <form method="post" action="{% url 'reviews:document-comment' review.document_id %}">
+    {% csrf_token %}
+    {{ comment_form.as_p }}
+    <button class="btn btn-secondary" type="submit">Add comment</button>
+  </form>
+</div>
+{% endblock %}
