@@ -171,6 +171,7 @@ def test_workflow_is_idempotent_and_supports_force(sample_analyze_result):
 
     assert not result.skipped
     assert result.document is not None
+    assert result.raw_result is not None
     assert result.document.summaries
     assert result.document.summaries[0].method == "heuristic_leading_sentences"
     assert len(client.calls) == 1

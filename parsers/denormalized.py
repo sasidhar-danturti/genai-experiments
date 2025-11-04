@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass, field, fields
 from datetime import datetime
 from enum import Enum
 from typing import Dict, Iterable, List, Optional, Tuple, Union

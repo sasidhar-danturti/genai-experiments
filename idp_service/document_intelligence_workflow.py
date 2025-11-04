@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from email import message_from_bytes
 from email.message import Message
@@ -135,7 +135,7 @@ class DocumentIntelligenceWorkflow:
 
         if not force and self._store.has_record(document_id, checksum):
             logger.info("Skipping document because an identical payload already exists", extra={"document_id": document_id})
-            return WorkflowResult(document=None, skipped=True, records=[])
+            return WorkflowResult(document=None, skipped=True, raw_result=None, records=[])
 
         analyze_result = self._service.analyze(
             document_bytes,
