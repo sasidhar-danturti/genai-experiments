@@ -189,7 +189,6 @@ def test_workflow_is_idempotent_and_supports_force(sample_analyze_result):
     )
 
     assert skipped.skipped
-    assert skipped.raw_result is None
     assert skipped.records == []
     assert len(client.calls) == 1
 
@@ -203,7 +202,6 @@ def test_workflow_is_idempotent_and_supports_force(sample_analyze_result):
     )
 
     assert not forced.skipped
-    assert forced.raw_result is not None
     assert forced.records
     assert len(client.calls) == 2
 
@@ -225,7 +223,6 @@ def test_workflow_retries_on_transient_failures(sample_analyze_result, monkeypat
     )
 
     assert not result.skipped
-    assert result.raw_result is not None
     assert result.records
     assert len(client.calls) == 2
 

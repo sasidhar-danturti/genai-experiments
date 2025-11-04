@@ -94,7 +94,6 @@ class WorkflowResult:
 
     document: Optional[CanonicalDocument]
     skipped: bool
-    raw_result: Optional[Any] = None
     records: List[DenormRecord] = field(default_factory=list)
 
 
@@ -144,8 +143,6 @@ class DocumentIntelligenceWorkflow:
             content_type=content_type,
         )
 
-        raw_result = _normalise_raw_result(analyze_result)
-
         canonical = self._adapter.transform(
             analyze_result,
             document_id=document_id,
@@ -164,9 +161,8 @@ class DocumentIntelligenceWorkflow:
         if self._summarizer is not None:
             summaries = self._summarizer.summarise(canonical)
             if summaries:
-                canonical = replace(
-                    canonical,
-                    summaries=list(canonical.summaries) + summaries,
+                canonical = canonical.model_copy(
+                    update={"summaries": list(canonical.summaries) + summaries}
                 )
 
         if self._enrichment_dispatcher is not None and enrich_with:
@@ -179,9 +175,8 @@ class DocumentIntelligenceWorkflow:
                     canonical.document_id, []
                 )
                 if enrichments:
-                    canonical = replace(
-                        canonical,
-                        enrichments=list(canonical.enrichments) + list(enrichments),
+                    canonical = canonical.model_copy(
+                        update={"enrichments": list(canonical.enrichments) + list(enrichments)}
                     )
 
         self._store.save(canonical)
@@ -190,12 +185,7 @@ class DocumentIntelligenceWorkflow:
             request_id=str(metadata.get("request_id", document_id)),
             generated_at=datetime.now(timezone.utc),
         )
-        return WorkflowResult(
-            document=canonical,
-            skipped=False,
-            raw_result=raw_result,
-            records=records,
-        )
+        return WorkflowResult(document=canonical, skipped=False, records=records)
 
     # ------------------------------------------------------------------
     # Attachment handling
@@ -287,7 +277,7 @@ class DocumentIntelligenceWorkflow:
         if not attachments:
             return canonical
 
-        return replace(canonical, attachments=list(canonical.attachments) + attachments)
+        return canonical.model_copy(update={"attachments": list(canonical.attachments) + attachments})
 
 
 def _checksum(payload: bytes) -> str:
@@ -301,28 +291,3 @@ def _build_request_kwargs(*, pages: Optional[Iterable[int]], content_type: Optio
     if content_type is not None:
         kwargs["content_type"] = content_type
     return kwargs
-
-
-def _normalise_raw_result(payload: Any) -> Any:
-    """Coerce Azure responses into serialisable structures when possible."""
-
-    if payload is None:
-        return None
-    if isinstance(payload, dict):
-        return payload
-
-    to_dict = getattr(payload, "to_dict", None)
-    if callable(to_dict):
-        try:
-            return to_dict()
-        except Exception:  # pragma: no cover - defensive
-            logger.debug("Unable to serialise Azure payload via to_dict", exc_info=True)
-
-    as_dict = getattr(payload, "as_dict", None)
-    if callable(as_dict):
-        try:
-            return as_dict()
-        except Exception:  # pragma: no cover - defensive
-            logger.debug("Unable to serialise Azure payload via as_dict", exc_info=True)
-
-    return payload

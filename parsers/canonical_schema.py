@@ -2,14 +2,29 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
+
+try:  # pragma: no cover - compatibility shim for pydantic v1/v2
+    from pydantic import BaseModel, Field, ConfigDict
+except ImportError:  # pragma: no cover
+    from pydantic import BaseModel, Field  # type: ignore
+
+    ConfigDict = None  # type: ignore
 
 SCHEMA_VERSION = "1.1"
 
 
-@dataclass(frozen=True)
-class BoundingRegion:
+class CanonicalModel(BaseModel):
+    """Base model that enforces immutability for canonical payloads."""
+
+    if 'ConfigDict' in globals() and ConfigDict is not None:  # pragma: no branch
+        model_config = ConfigDict(frozen=True)
+    else:  # pragma: no cover
+        class Config:
+            allow_mutation = False
+
+
+class BoundingRegion(CanonicalModel):
     """Represents the physical location of an element on a page."""
 
     page: int
@@ -25,8 +40,7 @@ class BoundingRegion:
         return payload
 
 
-@dataclass(frozen=True)
-class ConfidenceSignal:
+class ConfidenceSignal(CanonicalModel):
     """Represents a single confidence contribution from a parser."""
 
     source: str
@@ -34,7 +48,7 @@ class ConfidenceSignal:
     method: Optional[str] = None
     model: Optional[str] = None
     weight: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, object]:
         payload: Dict[str, object] = {
@@ -52,8 +66,7 @@ class ConfidenceSignal:
         return payload
 
 
-@dataclass(frozen=True)
-class ExtractionProvenance:
+class ExtractionProvenance(CanonicalModel):
     """Describes how a canonical element was extracted."""
 
     parser: str
@@ -61,7 +74,7 @@ class ExtractionProvenance:
     model: Optional[str] = None
     source: Optional[str] = None
     page_span: Optional[List[int]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, object]:
         payload: Dict[str, object] = {
@@ -80,8 +93,7 @@ class ExtractionProvenance:
         return payload
 
 
-@dataclass(frozen=True)
-class CanonicalTextSpan:
+class CanonicalTextSpan(CanonicalModel):
     """Normalised representation of a text span."""
 
     content: str
@@ -89,7 +101,7 @@ class CanonicalTextSpan:
     region: Optional[BoundingRegion] = None
     span_id: Optional[str] = None
     provenance: Optional[ExtractionProvenance] = None
-    confidence_signals: List[ConfidenceSignal] = field(default_factory=list)
+    confidence_signals: List[ConfidenceSignal] = Field(default_factory=list)
 
     def to_dict(self) -> Dict[str, object]:
         payload = {
@@ -107,8 +119,7 @@ class CanonicalTextSpan:
         return payload
 
 
-@dataclass(frozen=True)
-class VisualDescription:
+class VisualDescription(CanonicalModel):
     """Describes visual context for non-textual document elements such as images."""
 
     description: str
@@ -116,7 +127,7 @@ class VisualDescription:
     region: Optional[BoundingRegion] = None
     tags: Optional[List[str]] = None
     provenance: Optional[ExtractionProvenance] = None
-    confidence_signals: List[ConfidenceSignal] = field(default_factory=list)
+    confidence_signals: List[ConfidenceSignal] = Field(default_factory=list)
 
     def to_dict(self) -> Dict[str, object]:
         payload: Dict[str, object] = {
@@ -134,8 +145,7 @@ class VisualDescription:
         return payload
 
 
-@dataclass(frozen=True)
-class CanonicalTableCell:
+class CanonicalTableCell(CanonicalModel):
     """Cell within a canonical table."""
 
     row_index: int
@@ -146,7 +156,7 @@ class CanonicalTableCell:
     row_span: int = 1
     column_span: int = 1
     provenance: Optional[ExtractionProvenance] = None
-    confidence_signals: List[ConfidenceSignal] = field(default_factory=list)
+    confidence_signals: List[ConfidenceSignal] = Field(default_factory=list)
 
     def to_dict(self) -> Dict[str, object]:
         payload = {
@@ -165,13 +175,12 @@ class CanonicalTableCell:
         return payload
 
 
-@dataclass(frozen=True)
-class CanonicalTable:
+class CanonicalTable(CanonicalModel):
     """Normalized table representation."""
 
     table_id: str
     confidence: float
-    cells: List[CanonicalTableCell] = field(default_factory=list)
+    cells: List[CanonicalTableCell] = Field(default_factory=list)
     caption: Optional[str] = None
     footnotes: Optional[List[str]] = None
     provenance: Optional[ExtractionProvenance] = None
@@ -191,8 +200,7 @@ class CanonicalTable:
         return payload
 
 
-@dataclass(frozen=True)
-class StructuredField:
+class StructuredField(CanonicalModel):
     """Canonical representation of a structured field."""
 
     name: str
@@ -201,7 +209,7 @@ class StructuredField:
     value_type: Optional[str] = None
     region: Optional[BoundingRegion] = None
     provenance: Optional[ExtractionProvenance] = None
-    confidence_signals: List[ConfidenceSignal] = field(default_factory=list)
+    confidence_signals: List[ConfidenceSignal] = Field(default_factory=list)
 
     def to_dict(self) -> Dict[str, object]:
         payload: Dict[str, object] = {
@@ -220,15 +228,14 @@ class StructuredField:
         return payload
 
 
-@dataclass(frozen=True)
-class PageSegment:
+class PageSegment(CanonicalModel):
     """Describes which parser processed a particular page."""
 
     page_number: int
     parser: str
     method: Optional[str] = None
     confidence: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, object]:
         payload: Dict[str, object] = {
@@ -244,8 +251,7 @@ class PageSegment:
         return payload
 
 
-@dataclass(frozen=True)
-class DocumentAttachment:
+class DocumentAttachment(CanonicalModel):
     """Represents an attachment belonging to a canonical document (e.g. email)."""
 
     attachment_id: str
@@ -254,7 +260,7 @@ class DocumentAttachment:
     checksum: Optional[str] = None
     source_uri: Optional[str] = None
     document: Optional["CanonicalDocument"] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, object]:
         payload: Dict[str, object] = {
@@ -273,8 +279,7 @@ class DocumentAttachment:
         return payload
 
 
-@dataclass(frozen=True)
-class DocumentSummary:
+class DocumentSummary(CanonicalModel):
     """Machine- or heuristically-generated summary for a document."""
 
     summary: str
@@ -283,7 +288,7 @@ class DocumentSummary:
     title: Optional[str] = None
     model: Optional[str] = None
     justification: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, object]:
         payload: Dict[str, object] = {
@@ -302,8 +307,7 @@ class DocumentSummary:
         return payload
 
 
-@dataclass(frozen=True)
-class DocumentEnrichment:
+class DocumentEnrichment(CanonicalModel):
     """Structured representation of downstream enrichment signals."""
 
     enrichment_type: str
@@ -312,7 +316,7 @@ class DocumentEnrichment:
     confidence: Optional[float] = None
     model: Optional[str] = None
     duration_ms: Optional[int] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, object]:
         payload: Dict[str, object] = {
@@ -331,8 +335,7 @@ class DocumentEnrichment:
         return payload
 
 
-@dataclass(frozen=True)
-class CanonicalDocument:
+class CanonicalDocument(CanonicalModel):
     """Top-level canonical document payload."""
 
     document_id: str
@@ -341,15 +344,15 @@ class CanonicalDocument:
     text_spans: List[CanonicalTextSpan]
     tables: List[CanonicalTable]
     fields: List[StructuredField]
-    visual_descriptions: List[VisualDescription] = field(default_factory=list)
-    page_segments: List[PageSegment] = field(default_factory=list)
-    attachments: List[DocumentAttachment] = field(default_factory=list)
-    summaries: List[DocumentSummary] = field(default_factory=list)
-    enrichments: List[DocumentEnrichment] = field(default_factory=list)
+    visual_descriptions: List[VisualDescription] = Field(default_factory=list)
+    page_segments: List[PageSegment] = Field(default_factory=list)
+    attachments: List[DocumentAttachment] = Field(default_factory=list)
+    summaries: List[DocumentSummary] = Field(default_factory=list)
+    enrichments: List[DocumentEnrichment] = Field(default_factory=list)
     document_type: Optional[str] = None
     mime_type: Optional[str] = None
     schema_version: str = SCHEMA_VERSION
-    metadata: Dict[str, object] = field(default_factory=dict)
+    metadata: Dict[str, object] = Field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, object]:
         payload = {
@@ -382,6 +385,14 @@ class CanonicalDocument:
         """Return a dictionary suitable for persistence."""
 
         return self.to_dict()
+
+
+try:
+    DocumentAttachment.model_rebuild()
+    CanonicalDocument.model_rebuild()
+except AttributeError:
+    DocumentAttachment.update_forward_refs(CanonicalDocument=CanonicalDocument)
+    CanonicalDocument.update_forward_refs()
 
 
 def flatten_tables(tables: Iterable[CanonicalTable]) -> List[Dict[str, object]]:
