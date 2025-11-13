@@ -1,5 +1,6 @@
 """Independent document routing library used across ingestion services."""
 
+from .layout import HuggingFaceLayoutModelClient  # noqa: F401
 from .router import (  # noqa: F401
     ContentResolver,
     DocumentAnalysis,
@@ -46,4 +47,5 @@ __all__ = [
     "RouterConfig",
     "RoutingMode",
     "StrategyConfig",
+    "HuggingFaceLayoutModelClient",
 ]

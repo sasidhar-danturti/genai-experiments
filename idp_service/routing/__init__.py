@@ -27,6 +27,7 @@ from idp_router import (  # noqa: F401
     RouterConfig,
     RoutingMode,
     StrategyConfig,
+    HuggingFaceLayoutModelClient,
 )
 
 __all__ = [
@@ -51,4 +52,5 @@ __all__ = [
     "RouterConfig",
     "RoutingMode",
     "StrategyConfig",
+    "HuggingFaceLayoutModelClient",
 ]
