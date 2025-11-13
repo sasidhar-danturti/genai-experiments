@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "idp-router"
+version = "0.1.0"
+description = "Document layout analysis and routing helpers"
+readme = "docs/idp_router/README.md"
+requires-python = ">=3.9"
+authors = [
+  { name = "IDP Team" }
+]
+dependencies = []
+
+[project.optional-dependencies]
+pymupdf = ["PyMuPDF>=1.21.0"]
+huggingface = [
+  "pillow>=9.5.0",
+  "pytesseract>=0.3.10",
+  "torch>=2.0.0",
+  "transformers>=4.35.0",
+  "PyMuPDF>=1.21.0",
+]
+all = [
+  "PyMuPDF>=1.21.0",
+  "pillow>=9.5.0",
+  "pytesseract>=0.3.10",
+  "torch>=2.0.0",
+  "transformers>=4.35.0",
+]
+
+[project.urls]
+"Documentation" = "https://github.com/your-org/genai-experiments/tree/main/docs/idp_router"
+"Source" = "https://github.com/your-org/genai-experiments"
+
+[tool.setuptools]
+packages = ["idp_router"]
+
+[tool.setuptools.package-data]
+idp_router = ["py.typed"]

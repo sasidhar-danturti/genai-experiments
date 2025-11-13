@@ -36,10 +36,8 @@ into Databricks for downstream processing.
   necessary environment variables (e.g., `INGESTION_QUEUE_URL`).
 - Execute the SQL script in a Databricks SQL warehouse or notebook to create
   the tracking tables before running the job.
-- Review `docs/runbooks/document_processing_api.md` for the API contract,
+- Review `docs/runbooks/document_processing_api.md` for the API contract, deployment runbook, and IAM references.
 - Run `notebooks/idp_production_simulation.ipynb` to rehearse the end-to-end flow with production-style configuration TODOs and simulated SQS batches before wiring up live services.
 - Run `notebooks/idp_validation_suite.ipynb` to validate routing overrides, enrichment hooks, and idempotent persistence across sample documents before deploying changes.
-  deployment runbook, and IAM references.
-- Integrate against the API using the helper in
-  `clients/document_processing_client.py`, which demonstrates submission,
-  polling, and result pagination.
+- Explore the standalone router package via `docs/idp_router/README.md` and the accompanying `notebooks/idp_router_quickstart.ipynb` quickstart to integrate the routing logic into other services.
+- Integrate against the API using the helper in `clients/document_processing_client.py`, which demonstrates submission, polling, and result pagination.
