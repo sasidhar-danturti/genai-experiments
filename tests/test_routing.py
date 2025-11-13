@@ -10,6 +10,8 @@ import pytest
 # Allow tests to import the routing package without installing it.
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+from idp_router import DocumentRouter as LibraryDocumentRouter
+
 from idp_service.routing.router import (
     DocumentCategory,
     DocumentRouter,
@@ -208,3 +210,7 @@ def test_sniff_mime_type_detects_html_snippets():
     body = {"document_content": base64.b64encode(html_bytes).decode("ascii")}
 
     assert _sniff_mime_type("page.dat", body) == "text/html"
+
+
+def test_idp_router_exports_public_router_surface():
+    assert LibraryDocumentRouter is DocumentRouter
