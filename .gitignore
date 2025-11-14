@@ -2,3 +2,7 @@
 # Ignore generated sample documents
 docs/sample_documents/*
 !docs/sample_documents/README.md
+
+# Python build artefacts
+__pycache__/
+*.py[cod]

@@ -1,11 +1,7 @@
-"""Document routing package for ingestion workflows.
+"""Independent document routing library used across ingestion services."""
 
-This package now re-exports the standalone ``idp_router`` library so that
-existing imports continue to function while allowing the router to be
-packaged independently.
-"""
-
-from idp_router import (  # noqa: F401
+from .layout import HuggingFaceLayoutModelClient  # noqa: F401
+from .router import (  # noqa: F401
     ContentResolver,
     DocumentAnalysis,
     DocumentCategory,
@@ -27,7 +23,6 @@ from idp_router import (  # noqa: F401
     RouterConfig,
     RoutingMode,
     StrategyConfig,
-    HuggingFaceLayoutModelClient,
 )
 
 __all__ = [
