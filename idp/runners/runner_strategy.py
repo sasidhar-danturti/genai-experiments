@@ -5,6 +5,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pyspark.sql import DataFrame
 
+from idp.audit_logger import get_runtime_context, set_runtime_context
 from idp.runners.runner_context import RunnerContext
 from idp.runners.record_worker import RecordWorker
 
@@ -41,6 +42,9 @@ class DriverThreadPoolStrategy(RunnerStrategy):
 class SparkPartitionStrategy(RunnerStrategy):
     def execute(self, records_or_df: DataFrame, worker: RecordWorker, ctx: RunnerContext) -> List[Any]:
         df = records_or_df
+        spark = df.sparkSession
+        context_snapshot = get_runtime_context()
+        context_broadcast = spark.sparkContext.broadcast(context_snapshot)
         try:
             row_count = df.count()
             if ctx.partition_size and row_count > ctx.partition_size:
@@ -50,6 +54,7 @@ class SparkPartitionStrategy(RunnerStrategy):
             pass
 
         def process_partition(rows_iter):
+            set_runtime_context(context_broadcast.value)
             local_worker = worker if worker.is_spark_serializable else type(worker)()
             for row in rows_iter:
                 attempt = 1
