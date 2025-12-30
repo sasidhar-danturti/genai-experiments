@@ -230,14 +230,20 @@ class BaseRunner:
                 input_obj = self._collect_and_dedupe_df(input_obj, ctx)
 
             if not isinstance(input_obj, DataFrame):
-                records = list(input_obj)
-                records = [
-                    self.input_model.from_spark_row(r)
-                    if not isinstance(r, self.input_model)
-                    else r
-                    for r in records
-                ]
-                records = self._dedupe(records)
+                if (
+                    isinstance(input_obj, list)
+                    and not self.idempotency_keys
+                    and all(isinstance(r, self.input_model) for r in input_obj)
+                ):
+                    records = input_obj
+                else:
+                    records = [
+                        self.input_model.from_spark_row(r)
+                        if not isinstance(r, self.input_model)
+                        else r
+                        for r in input_obj
+                    ]
+                    records = self._dedupe(records)
                 input_obj = records
 
             strategy: RunnerStrategy = self.planner.pick(input_obj, self.worker, ctx)
