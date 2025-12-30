@@ -8,7 +8,7 @@ from idp.runners.runner_planner import RunnerPlanner
 from idp.runners.runner_strategy import RunnerStrategy
 from idp.runners.record_worker import RecordWorker
 
-from idp.audit_logger import DEPENDENCY_PROVIDER
+from idp.runtime_context import DEPENDENCY_PROVIDER
 from idp.config_manager import CONFIG
 from idp.db_manager.db_adapter import DBAdapter, make_adapter
 from idp.db_manager.spark_models import (

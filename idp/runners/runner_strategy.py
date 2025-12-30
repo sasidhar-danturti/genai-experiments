@@ -5,7 +5,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pyspark.sql import DataFrame
 
-from idp.audit_logger import get_runtime_context, set_runtime_context
+from idp.runtime_context import get_runtime_context, set_runtime_context
 from idp.runners.runner_context import RunnerContext
 from idp.runners.record_worker import RecordWorker
 
