@@ -49,13 +49,13 @@ class SparkPartitionStrategy(RunnerStrategy):
         spark = df.sparkSession
         context_snapshot = get_runtime_context()
         context_broadcast = spark.sparkContext.broadcast(context_snapshot)
-        try:
-            row_count = df.count()
-            if ctx.partition_size and row_count > ctx.partition_size:
-                target_parts = max(1, row_count // ctx.partition_size)
+        if ctx.partition_size:
+            try:
+                current_parts = df.rdd.getNumPartitions()
+                target_parts = max(1, current_parts)
                 df = df.repartition(target_parts)
-        except Exception:
-            pass
+            except Exception:
+                pass
 
         def process_partition(rows_iter):
             set_runtime_context(context_broadcast.value)

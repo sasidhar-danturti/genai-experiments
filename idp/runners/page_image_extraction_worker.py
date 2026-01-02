@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from typing import List
 
 import fitz
@@ -16,6 +17,7 @@ from idp.runners.record_worker import RecordWorker
 class PageImageExtractionWorker(RecordWorker):
     is_spark_serializable = False
     is_threadsafe = True
+    default_dpi = 100
 
     def process(
         self, record: AttachmentExtractionOutput
@@ -41,6 +43,7 @@ class PageImageExtractionWorker(RecordWorker):
         try:
             if lower_path.endswith(".pdf"):
                 doc = fitz.open(path)
+                dpi = int(os.getenv("IDP_PAGE_IMAGE_DPI", str(self.default_dpi)))
                 for page_num in range(doc.page_count):
                     page = doc.load_page(page_num)
                     page_rect = page.rect
@@ -62,7 +65,7 @@ class PageImageExtractionWorker(RecordWorker):
                     if page_area > 0 and (total_image_area / page_area >= 0.95):
                         has_full_page_image = True
 
-                    content = page.read_contents() if page.read_contents() else b""
+                    content = page.read_contents() or b""
                     has_text_ops = b"Tj" in content or b"Td" in content
                     has_image_ops = b"Do" in content
                     extracted_text = page.get_text("text").strip()
@@ -93,7 +96,7 @@ class PageImageExtractionWorker(RecordWorker):
                         "total_image_area": total_image_area,
                     }
 
-                    pix = page.get_pixmap(dpi=150)
+                    pix = page.get_pixmap(dpi=dpi)
                     img_bytes = pix.tobytes("png")
                     b64_img = base64.b64encode(img_bytes).decode("utf-8")
                     image_base64 = f"data:image/png;base64,{b64_img}"
