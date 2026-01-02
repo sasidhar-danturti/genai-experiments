@@ -5,17 +5,17 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import ArrayType, BooleanType, StringType, StructField, StructType
 
 from idp.db_manager.spark_models import (
-    AttachmentExtractionInput,
     AttachmentExtractionOutput,
+    DownloadProcessOutput,
 )
 from idp.runners.attachment_extraction_worker import AttachmentExtractionWorker
 from idp.runners.base_runner import BaseRunner
 
 
 class AttachmentExtractionRunner(BaseRunner):
-    input_model = AttachmentExtractionInput
+    input_model = DownloadProcessOutput
     output_model = AttachmentExtractionOutput
-    input_table = "current_downloaded_docs"
+    input_table = "download_process_output"
     history_table = "current_docs_with_attachments"
 
     def __init__(self, adapter=None, planner=None, is_first: bool = True, is_last: bool = True) -> None:

@@ -5,7 +5,7 @@ from email import policy
 from email import message_from_binary_file
 from typing import Optional
 
-from idp.db_manager.spark_models import AttachmentExtractionInput, AttachmentExtractionOutput
+from idp.db_manager.spark_models import AttachmentExtractionOutput, DownloadProcessOutput
 from idp.runners.record_worker import RecordWorker
 
 
@@ -53,7 +53,7 @@ class AttachmentExtractionWorker(RecordWorker):
                         with open(filename, "wb") as handle:
                             handle.write(part.get_payload(decode=True))
 
-    def process(self, record: AttachmentExtractionInput) -> AttachmentExtractionOutput:
+    def process(self, record: DownloadProcessOutput) -> AttachmentExtractionOutput:
         file_extension = (record.file_extension or "").lower()
         downloaded_path = ""
 

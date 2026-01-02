@@ -62,13 +62,6 @@ class FileProcess(SparkModel):
 
 
 @dataclass
-class AttachmentExtractionInput(SparkModel):
-    __tablename__: ClassVar[str] = "current_downloaded_docs"
-
-    docuid: str
-    file_path: str
-
-
 @dataclass
 class AttachmentExtractionOutput(SparkModel):
     __tablename__: ClassVar[str] = "current_docs_with_attachments"
@@ -83,5 +76,20 @@ class AttachmentExtractionOutput(SparkModel):
     is_inline: bool
     downloaded_attachment_path: str
     status: str
+    batch_id: Optional[str] = None
+    task_id: Optional[str] = None
+
+
+@dataclass
+class DownloadProcessOutput(SparkModel):
+    __tablename__: ClassVar[str] = "download_process_output"
+
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    file_path: str
+    status: str
+    repo: Optional[str]
+    docuid: str
     batch_id: Optional[str] = None
     task_id: Optional[str] = None
