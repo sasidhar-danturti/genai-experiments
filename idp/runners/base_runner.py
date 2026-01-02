@@ -22,6 +22,7 @@ from idp.db_manager.spark_models import (
 
 
 class BaseRunner:
+    required_class_vars = ("input_model", "output_model", "input_table")
     input_model = None
     output_model = None
     input_table: Optional[str] = None
@@ -52,6 +53,18 @@ class BaseRunner:
         FileProcess.set_table_name(CONFIG.audit_tables.file_process)
         TaskExecution.set_table_name(CONFIG.audit_tables.task_execution)
         self._record_start(CONFIG, self.runner_name)
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        super().__init_subclass__(**kwargs)
+        missing = [
+            name
+            for name in cls.required_class_vars
+            if getattr(cls, name, None) is None
+        ]
+        if missing:
+            raise TypeError(
+                f"{cls.__name__} must define class variables: {', '.join(missing)}"
+            )
 
     def _get_or_generate(self, kind: str) -> str:
         from idp.utils.databricks_utils import get_databricks_utils
