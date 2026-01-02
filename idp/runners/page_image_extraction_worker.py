@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 from typing import List
 
 import fitz
@@ -30,7 +31,7 @@ class PageImageExtractionWorker(RecordWorker):
                     downloaded_attachment_path=record.downloaded_attachment_path,
                     page_image=None,
                     page_number=None,
-                    page_metadata=None,
+                    page_metadata_json=None,
                     status="ERRORED",
                 )
             )
@@ -103,7 +104,7 @@ class PageImageExtractionWorker(RecordWorker):
                             downloaded_attachment_path=record.downloaded_attachment_path,
                             page_image=image_base64,
                             page_number=page_num + 1,
-                            page_metadata=page_meta_data,
+                            page_metadata_json=json.dumps(page_meta_data),
                             status="COMPLETED",
                         )
                     )
@@ -121,7 +122,7 @@ class PageImageExtractionWorker(RecordWorker):
                         downloaded_attachment_path=record.downloaded_attachment_path,
                         page_image=image_base64,
                         page_number=1,
-                        page_metadata={},
+                        page_metadata_json=json.dumps({}),
                         status="COMPLETED",
                     )
                 )
@@ -133,7 +134,7 @@ class PageImageExtractionWorker(RecordWorker):
                         downloaded_attachment_path=record.downloaded_attachment_path,
                         page_image=None,
                         page_number=None,
-                        page_metadata=None,
+                        page_metadata_json=None,
                         status="ERRORED",
                     )
                 )
@@ -145,7 +146,7 @@ class PageImageExtractionWorker(RecordWorker):
                     downloaded_attachment_path=record.downloaded_attachment_path,
                     page_image=None,
                     page_number=None,
-                    page_metadata=None,
+                    page_metadata_json=None,
                     status="ERRORED",
                 )
             )

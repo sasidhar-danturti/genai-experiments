@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 import uuid
-from typing import Any, ClassVar, Dict, Optional
+from typing import ClassVar, Optional
 
 
 class SparkModel:
@@ -103,7 +103,7 @@ class PageImageExtractionOutput(SparkModel):
     downloaded_attachment_path: str
     page_image: Optional[str]
     page_number: Optional[int]
-    page_metadata: Optional[Dict[str, Any]]
+    page_metadata_json: Optional[str]
     status: str
     batch_id: Optional[str] = None
     task_id: Optional[str] = None
