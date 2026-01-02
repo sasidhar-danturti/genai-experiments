@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 import uuid
-from typing import ClassVar, Optional
+from typing import Any, ClassVar, Dict, Optional
 
 
 class SparkModel:
@@ -62,7 +62,6 @@ class FileProcess(SparkModel):
 
 
 @dataclass
-@dataclass
 class AttachmentExtractionOutput(SparkModel):
     __tablename__: ClassVar[str] = "current_docs_with_attachments"
 
@@ -91,5 +90,20 @@ class DownloadProcessOutput(SparkModel):
     status: str
     repo: Optional[str]
     docuid: str
+    batch_id: Optional[str] = None
+    task_id: Optional[str] = None
+
+
+@dataclass
+class PageImageExtractionOutput(SparkModel):
+    __tablename__: ClassVar[str] = "current_docs_with_page_images"
+
+    docuid: str
+    final_docuid: str
+    downloaded_attachment_path: str
+    page_image: Optional[str]
+    page_number: Optional[int]
+    page_metadata: Optional[Dict[str, Any]]
+    status: str
     batch_id: Optional[str] = None
     task_id: Optional[str] = None
