@@ -13,7 +13,12 @@ class LakehouseAdapter(DBAdapter):
     def write(self, tier: str, data: SparkModel) -> None:
         raise NotImplementedError("LakehouseAdapter.write is a stub.")
 
-    def write_batch(self, tier: str, data_list: Iterable[SparkModel]) -> None:
+    def write_batch(
+        self,
+        tier: str,
+        data_list: Iterable[SparkModel],
+        mode: str = "append",
+    ) -> None:
         raise NotImplementedError("LakehouseAdapter.write_batch is a stub.")
 
     def read(self, tier: str, model: Type[SparkModel], filter_condition: Optional[str] = None) -> List[SparkModel]:

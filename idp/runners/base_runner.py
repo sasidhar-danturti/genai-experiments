@@ -293,12 +293,12 @@ class BaseRunner:
                     )
 
             if outputs:
-                self.adapter.write_batch(ctx.output_tier, outputs)
+                self.adapter.write_batch(ctx.output_tier, outputs, mode="overwrite")
                 if self.history_table:
                     original_table = getattr(self.output_model, "__tablename__", None)
                     self.output_model.set_table_name(self.history_table)
                     try:
-                        self.adapter.write_batch(ctx.output_tier, outputs)
+                        self.adapter.write_batch(ctx.output_tier, outputs, mode="append")
                     finally:
                         if original_table:
                             self.output_model.set_table_name(original_table)

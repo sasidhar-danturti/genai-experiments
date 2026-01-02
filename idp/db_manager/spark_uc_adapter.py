@@ -27,9 +27,19 @@ class SparkUCAdapter(DBAdapter):
         catalog, schema = self._catalog_schema(tier)
         self.sp_obj.write(catalog=catalog, schema=schema, data=data)
 
-    def write_batch(self, tier: str, data_list: Iterable[SparkModel]) -> None:
+    def write_batch(
+        self,
+        tier: str,
+        data_list: Iterable[SparkModel],
+        mode: str = "append",
+    ) -> None:
         catalog, schema = self._catalog_schema(tier)
-        self.sp_obj.write_batch(catalog=catalog, schema=schema, data_list=list(data_list))
+        self.sp_obj.write_batch(
+            catalog=catalog,
+            schema=schema,
+            data_list=list(data_list),
+            mode=mode,
+        )
 
     def read(self, tier: str, model: Type[SparkModel], filter_condition: Optional[str] = None) -> List[SparkModel]:
         catalog, schema = self._catalog_schema(tier)

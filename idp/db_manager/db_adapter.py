@@ -13,7 +13,12 @@ class DBAdapter(ABC):
         ...
 
     @abstractmethod
-    def write_batch(self, tier: str, data_list: Iterable[SparkModel]) -> None:
+    def write_batch(
+        self,
+        tier: str,
+        data_list: Iterable[SparkModel],
+        mode: str = "append",
+    ) -> None:
         ...
 
     @abstractmethod

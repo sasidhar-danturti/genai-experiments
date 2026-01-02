@@ -6,7 +6,13 @@ class SparkDBManager:
     def write(self, catalog: str, schema: str, data: SparkModel) -> None:
         raise NotImplementedError("SparkDBManager.write is a stub.")
 
-    def write_batch(self, catalog: str, schema: str, data_list: Iterable[SparkModel]) -> None:
+    def write_batch(
+        self,
+        catalog: str,
+        schema: str,
+        data_list: Iterable[SparkModel],
+        mode: str = "append",
+    ) -> None:
         raise NotImplementedError("SparkDBManager.write_batch is a stub.")
 
     def read(self, catalog: str, schema: str, model: Type[SparkModel], filter_condition: Optional[str] = None) -> List[SparkModel]:
