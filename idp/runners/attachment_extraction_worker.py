@@ -5,7 +5,7 @@ from email import policy
 from email import message_from_binary_file
 from typing import Optional
 
-from idp.db_manager.attachment_models import AttachmentExtractionInput, AttachmentExtractionOutput
+from idp.db_manager.spark_models import AttachmentExtractionInput, AttachmentExtractionOutput
 from idp.runners.record_worker import RecordWorker
 
 

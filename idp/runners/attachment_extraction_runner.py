@@ -4,7 +4,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import ArrayType, BooleanType, StringType, StructField, StructType
 
-from idp.db_manager.attachment_models import (
+from idp.db_manager.spark_models import (
     AttachmentExtractionInput,
     AttachmentExtractionOutput,
 )

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 import uuid
-from typing import ClassVar
+from typing import ClassVar, Optional
 
 
 class SparkModel:
@@ -59,3 +59,29 @@ class FileProcess(SparkModel):
     error_message: str = ""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class AttachmentExtractionInput(SparkModel):
+    __tablename__: ClassVar[str] = "current_downloaded_docs"
+
+    docuid: str
+    file_path: str
+
+
+@dataclass
+class AttachmentExtractionOutput(SparkModel):
+    __tablename__: ClassVar[str] = "current_docs_with_attachments"
+
+    docuid: str
+    final_docuid: str
+    file_path: str
+    file_extension: str
+    file_name: str
+    attachment_index: int
+    attachment_name: Optional[str]
+    is_inline: bool
+    downloaded_attachment_path: str
+    status: str
+    batch_id: Optional[str] = None
+    task_id: Optional[str] = None
