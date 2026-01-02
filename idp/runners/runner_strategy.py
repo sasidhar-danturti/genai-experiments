@@ -23,7 +23,11 @@ class DriverThreadPoolStrategy(RunnerStrategy):
         with ThreadPoolExecutor(max_workers=ctx.max_concurrency) as pool:
             fut_map = {pool.submit(self._run_with_retry, worker, rec, ctx): rec for rec in records}
             for fut in as_completed(fut_map):
-                outputs.append(fut.result())
+                result = fut.result()
+                if isinstance(result, list):
+                    outputs.extend(result)
+                else:
+                    outputs.append(result)
         return outputs
 
     def _run_with_retry(self, worker, rec, ctx):
@@ -60,7 +64,12 @@ class SparkPartitionStrategy(RunnerStrategy):
                 attempt = 1
                 while True:
                     try:
-                        yield local_worker.process(row)
+                        result = local_worker.process(row)
+                        if isinstance(result, list):
+                            for item in result:
+                                yield item
+                        else:
+                            yield result
                         break
                     except Exception:
                         if attempt >= ctx.max_attempts:
