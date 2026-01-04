@@ -100,10 +100,32 @@ class PageImageExtractionOutput(SparkModel):
 
     docuid: str
     final_docuid: str
+    attachment_name: Optional[str]
     downloaded_attachment_path: str
+    file_extension: Optional[str]
+    file_name: Optional[str]
     page_image: Optional[str]
     page_number: Optional[int]
     page_metadata_json: Optional[str]
+    status: str
+    batch_id: Optional[str] = None
+    task_id: Optional[str] = None
+
+
+@dataclass
+class RoutePredictionOutput(SparkModel):
+    __tablename__: ClassVar[str] = "current_routes_responses"
+
+    docuid: str
+    final_docuid: str
+    attachment_name: Optional[str]
+    downloaded_attachment_path: str
+    file_extension: Optional[str]
+    file_name: Optional[str]
+    page_image: Optional[str]
+    page_number: Optional[int]
+    route_prediction_json: Optional[str]
+    route_decision: Optional[str]
     status: str
     batch_id: Optional[str] = None
     task_id: Optional[str] = None
