@@ -6,6 +6,8 @@ from idp.runners.page_image_extraction_runner import PageImageExtractionRunner
 from idp.runners.page_image_extraction_worker import PageImageExtractionWorker
 from idp.runners.page_route_classifier_runner import PageRouteClassifierRunner
 from idp.runners.page_route_classifier_worker import PageRouteClassifierWorker
+from idp.runners.pymupdf_parser_runner import PyMuPDFParserRunner
+from idp.runners.pymupdf_parser_worker import PyMuPDFParserWorker
 
 __all__ = [
     "AttachmentExtractionRunner",
@@ -14,4 +16,6 @@ __all__ = [
     "PageImageExtractionWorker",
     "PageRouteClassifierRunner",
     "PageRouteClassifierWorker",
+    "PyMuPDFParserRunner",
+    "PyMuPDFParserWorker",
 ]

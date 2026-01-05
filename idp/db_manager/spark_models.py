@@ -129,3 +129,18 @@ class RoutePredictionOutput(SparkModel):
     status: str
     batch_id: Optional[str] = None
     task_id: Optional[str] = None
+
+
+@dataclass
+class PyMuPDFResponseOutput(SparkModel):
+    __tablename__: ClassVar[str] = "current_pymupdf_responses"
+
+    docuid: str
+    final_docuid: str
+    downloaded_attachment_path: str
+    page_number: Optional[int]
+    parser_response: Optional[str]
+    parser_type: str
+    status: str
+    batch_id: Optional[str] = None
+    task_id: Optional[str] = None
