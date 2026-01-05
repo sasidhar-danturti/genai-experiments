@@ -12,6 +12,8 @@ from idp.runners.adi_parser_runner import ADIParserRunner
 from idp.runners.adi_parser_worker import ADIParserWorker
 from idp.runners.llm_parser_runner import LLMParserRunner
 from idp.runners.llm_parser_worker import LLMParserWorker
+from idp.runners.adi_llm_parser_runner import ADILLMParserRunner
+from idp.runners.adi_llm_parser_worker import ADILLMParserWorker
 
 __all__ = [
     "AttachmentExtractionRunner",
@@ -26,4 +28,6 @@ __all__ = [
     "ADIParserWorker",
     "LLMParserRunner",
     "LLMParserWorker",
+    "ADILLMParserRunner",
+    "ADILLMParserWorker",
 ]
