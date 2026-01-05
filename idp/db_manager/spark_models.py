@@ -144,3 +144,18 @@ class PyMuPDFResponseOutput(SparkModel):
     status: str
     batch_id: Optional[str] = None
     task_id: Optional[str] = None
+
+
+@dataclass
+class ADIResponseOutput(SparkModel):
+    __tablename__: ClassVar[str] = "current_adi_responses"
+
+    docuid: str
+    final_docuid: str
+    file_name: Optional[str]
+    page_number: Optional[int]
+    parser_response: Optional[str]
+    parser_type: str
+    status: str
+    batch_id: Optional[str] = None
+    task_id: Optional[str] = None
