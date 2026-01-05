@@ -10,6 +10,8 @@ from idp.runners.pymupdf_parser_runner import PyMuPDFParserRunner
 from idp.runners.pymupdf_parser_worker import PyMuPDFParserWorker
 from idp.runners.adi_parser_runner import ADIParserRunner
 from idp.runners.adi_parser_worker import ADIParserWorker
+from idp.runners.llm_parser_runner import LLMParserRunner
+from idp.runners.llm_parser_worker import LLMParserWorker
 
 __all__ = [
     "AttachmentExtractionRunner",
@@ -22,4 +24,6 @@ __all__ = [
     "PyMuPDFParserWorker",
     "ADIParserRunner",
     "ADIParserWorker",
+    "LLMParserRunner",
+    "LLMParserWorker",
 ]

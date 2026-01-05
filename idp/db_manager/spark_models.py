@@ -159,3 +159,17 @@ class ADIResponseOutput(SparkModel):
     status: str
     batch_id: Optional[str] = None
     task_id: Optional[str] = None
+
+
+@dataclass
+class LLMResponseOutput(SparkModel):
+    __tablename__: ClassVar[str] = "current_llm_responses"
+
+    docuid: str
+    final_docuid: str
+    page_image: Optional[str]
+    parser_response: Optional[str]
+    parser_type: str
+    status: str
+    batch_id: Optional[str] = None
+    task_id: Optional[str] = None
