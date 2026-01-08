@@ -5,21 +5,18 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from idp.db_manager.spark_models import DocPageOutput, DocSummaryInputOutput, DocTextOutput
+from idp.runners.aggregation_runner import AggregationRunner
 from idp.runners.normalization_helpers import extract_adi_structured
 
 
-class DocTextSummaryRunner:
-    def __init__(self, spark, adapter) -> None:
-        self.spark = spark
-        self.adapter = adapter
+class DocTextSummaryRunner(AggregationRunner):
+    input_table = DocPageOutput.__tablename__
+    output_tables = (
+        DocTextOutput.__tablename__,
+        DocSummaryInputOutput.__tablename__,
+    )
 
-    def load_inputs_dataframe(self) -> DataFrame:
-        return self.adapter.read_dataframe("bronze", DocPageOutput.__tablename__)
-
-    def run(self, df_or_records: DataFrame = None) -> None:
-        if df_or_records is None:
-            df_or_records = self.load_inputs_dataframe()
-
+    def build_outputs(self, df_or_records: DataFrame) -> dict[str, DataFrame]:
         doc_text_df = (
             df_or_records.groupBy("docuid")
             .agg(
@@ -64,8 +61,6 @@ class DocTextSummaryRunner:
             .drop("ex_pages", "std_pages")
         )
 
-        self.adapter.write_dataframe("bronze", DocTextOutput.__tablename__, doc_text_df)
-
         extract_adi_structured_udf = F.udf(extract_adi_structured, "string")
         summary_input_df = (
             doc_text_df.withColumn(
@@ -91,5 +86,7 @@ class DocTextSummaryRunner:
                 ),
             )
         )
-
-        self.adapter.write_dataframe("bronze", DocSummaryInputOutput.__tablename__, summary_input_df)
+        return {
+            DocTextOutput.__tablename__: doc_text_df,
+            DocSummaryInputOutput.__tablename__: summary_input_df,
+        }

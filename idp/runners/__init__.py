@@ -19,6 +19,7 @@ from idp.runners.normalization_worker import NormalizedResponseWorker
 from idp.runners.doc_pages_runner import DocPagesRunner
 from idp.runners.doc_pages_worker import DocPagesWorker
 from idp.runners.doc_text_summary_runner import DocTextSummaryRunner
+from idp.runners.aggregation_runner import AggregationRunner
 
 __all__ = [
     "AttachmentExtractionRunner",
@@ -40,4 +41,5 @@ __all__ = [
     "DocPagesRunner",
     "DocPagesWorker",
     "DocTextSummaryRunner",
+    "AggregationRunner",
 ]
