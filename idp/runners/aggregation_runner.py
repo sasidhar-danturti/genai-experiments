@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from typing import Dict, Optional, Sequence
 
 from loguru import logger
@@ -15,7 +16,7 @@ class _AggregationWorker(RecordWorker):
         raise NotImplementedError("AggregationRunner does not process records.")
 
 
-class AggregationRunner(BaseRunner):
+class AggregationRunner(BaseRunner, ABC):
     required_class_vars = ("input_table", "output_tables")
     input_table: Optional[str] = None
     output_tables: Optional[Sequence[str]] = None
@@ -36,8 +37,9 @@ class AggregationRunner(BaseRunner):
             is_last=is_last,
         )
 
+    @abstractmethod
     def build_outputs(self, df: DataFrame) -> Dict[str, DataFrame]:
-        raise NotImplementedError
+        ...
 
     def run(self, df_or_records: Optional[DataFrame] = None) -> Dict[str, DataFrame]:
         try:
