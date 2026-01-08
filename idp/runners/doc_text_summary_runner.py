@@ -90,3 +90,6 @@ class DocTextSummaryRunner(AggregationRunner):
             DocTextOutput.__tablename__: doc_text_df,
             DocSummaryInputOutput.__tablename__: summary_input_df,
         }
+
+    def run(self, df_or_records: DataFrame = None) -> dict[str, DataFrame]:
+        return super().run(df_or_records)
