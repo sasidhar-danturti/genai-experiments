@@ -49,6 +49,9 @@ class SparkUCAdapter(DBAdapter):
         catalog, schema = self._catalog_schema(tier)
         return self.sp_obj.read_dataframe(catalog=catalog, schema=schema, table=table, filter_condition=filter_condition)
 
+    def write_dataframe(self, tier: str, table: str, df, mode: str = "overwrite") -> None:
+        df.write.format("delta").mode(mode).saveAsTable(self.qualified_table(tier, table))
+
     def update_records(self, tier: str, model_instance: SparkModel, fields_to_update: List[str]) -> None:
         catalog, schema = self._catalog_schema(tier)
         self.sp_obj.update_records(catalog=catalog, schema=schema, model_instance=model_instance, fields_to_update=fields_to_update)

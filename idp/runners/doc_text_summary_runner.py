@@ -64,9 +64,7 @@ class DocTextSummaryRunner:
             .drop("ex_pages", "std_pages")
         )
 
-        doc_text_df.write.format("delta").mode("overwrite").saveAsTable(
-            f"{self.adapter.qualified_table('bronze', DocTextOutput.__tablename__)}"
-        )
+        self.adapter.write_dataframe("bronze", DocTextOutput.__tablename__, doc_text_df)
 
         extract_adi_structured_udf = F.udf(extract_adi_structured, "string")
         summary_input_df = (
@@ -94,6 +92,4 @@ class DocTextSummaryRunner:
             )
         )
 
-        summary_input_df.write.format("delta").mode("overwrite").saveAsTable(
-            f"{self.adapter.qualified_table('bronze', DocSummaryInputOutput.__tablename__)}"
-        )
+        self.adapter.write_dataframe("bronze", DocSummaryInputOutput.__tablename__, summary_input_df)

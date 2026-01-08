@@ -30,6 +30,10 @@ class DBAdapter(ABC):
         ...
 
     @abstractmethod
+    def write_dataframe(self, tier: str, table: str, df, mode: str = "overwrite") -> None:
+        ...
+
+    @abstractmethod
     def update_records(self, tier: str, model_instance: SparkModel, fields_to_update: List[str]) -> None:
         ...
 

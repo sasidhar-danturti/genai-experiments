@@ -27,5 +27,8 @@ class LakehouseAdapter(DBAdapter):
     def read_dataframe(self, tier: str, table: str, filter_condition: Optional[str] = None):
         raise NotImplementedError("LakehouseAdapter.read_dataframe is a stub.")
 
+    def write_dataframe(self, tier: str, table: str, df, mode: str = "overwrite") -> None:
+        raise NotImplementedError("LakehouseAdapter.write_dataframe is a stub.")
+
     def update_records(self, tier: str, model_instance: SparkModel, fields_to_update: List[str]) -> None:
         raise NotImplementedError("LakehouseAdapter.update_records is a stub.")
