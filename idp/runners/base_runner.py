@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence
 from loguru import logger
 from pyspark.sql import SparkSession, DataFrame
 
@@ -213,6 +213,32 @@ class BaseRunner:
         if not self.input_table:
             raise ValueError("input_table must be set to load a DataFrame.")
         return self.adapter.read_dataframe(tier, self.input_table, filter_condition=filter_condition)
+
+    def run_dataframe(
+        self,
+        df_or_records: Optional[DataFrame],
+        build_outputs: Callable[[DataFrame], Dict[str, DataFrame]],
+        output_tables: Optional[Sequence[str]] = None,
+        output_tier: str = "bronze",
+    ) -> Dict[str, DataFrame]:
+        try:
+            if df_or_records is None:
+                df_or_records = self.load_inputs_dataframe()
+            outputs = build_outputs(df_or_records)
+            if output_tables:
+                missing = set(output_tables) - set(outputs.keys())
+                if missing:
+                    raise ValueError(
+                        f"Missing outputs for tables: {', '.join(sorted(missing))}"
+                    )
+            for table_name, output_df in outputs.items():
+                self.adapter.write_dataframe(output_tier, table_name, output_df)
+            self._update_audit(errored=False)
+            return outputs
+        except Exception as error:
+            logger.exception(f"Runner failed: {error}")
+            self._update_audit(errored=True)
+            raise
 
     def run(self, df_or_records: Any = None, ctx_overrides: Optional[dict] = None) -> List[Any]:
         ctx = RunnerContext(
