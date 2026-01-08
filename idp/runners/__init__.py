@@ -14,6 +14,11 @@ from idp.runners.llm_parser_runner import LLMParserRunner
 from idp.runners.llm_parser_worker import LLMParserWorker
 from idp.runners.adi_llm_parser_runner import ADILLMParserRunner
 from idp.runners.adi_llm_parser_worker import ADILLMParserWorker
+from idp.runners.normalization_runner import NormalizedResponseRunner
+from idp.runners.normalization_worker import NormalizedResponseWorker
+from idp.runners.doc_pages_runner import DocPagesRunner
+from idp.runners.doc_pages_worker import DocPagesWorker
+from idp.runners.doc_text_summary_runner import DocTextSummaryRunner
 
 __all__ = [
     "AttachmentExtractionRunner",
@@ -30,4 +35,9 @@ __all__ = [
     "LLMParserWorker",
     "ADILLMParserRunner",
     "ADILLMParserWorker",
+    "NormalizedResponseRunner",
+    "NormalizedResponseWorker",
+    "DocPagesRunner",
+    "DocPagesWorker",
+    "DocTextSummaryRunner",
 ]

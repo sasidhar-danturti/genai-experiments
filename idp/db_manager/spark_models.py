@@ -187,3 +187,73 @@ class ADILLMResponseOutput(SparkModel):
     status: str
     batch_id: Optional[str] = None
     task_id: Optional[str] = None
+
+
+@dataclass
+class NormalizedResponseOutput(SparkModel):
+    __tablename__: ClassVar[str] = "current_normalised_responses"
+
+    docuid: str
+    final_docuid: Optional[str]
+    parser_type: str
+    parser_response: Optional[str]
+    page_number: Optional[int]
+    normalized_response_json: str
+    status: str
+    batch_id: Optional[str] = None
+    task_id: Optional[str] = None
+
+
+@dataclass
+class DocPageOutput(SparkModel):
+    __tablename__: ClassVar[str] = "current_extracted_pages"
+
+    docuid: str
+    parser_type: str
+    source: str
+    doc_kind: str
+    normalized_response_json: str
+    page_number: int
+    extracted_page_text: str
+    page_avg_conf: Optional[float]
+    page_low_conf_words: int
+    page_total_words: int
+    standardized_page_text: str
+    batch_id: Optional[str] = None
+    task_id: Optional[str] = None
+
+
+@dataclass
+class DocTextOutput(SparkModel):
+    __tablename__: ClassVar[str] = "current_extracted_doc_texts"
+
+    docuid: str
+    extracted_doc_text: str
+    standardized_doc_text: str
+    doc_avg_conf: Optional[float]
+    doc_low_conf_words: int
+    doc_total_words: int
+    source: Optional[str]
+    parser_type: Optional[str]
+    doc_kind: Optional[str]
+    normalized_response_json: Optional[str]
+    batch_id: Optional[str] = None
+    task_id: Optional[str] = None
+
+
+@dataclass
+class DocSummaryInputOutput(SparkModel):
+    __tablename__: ClassVar[str] = "current_doc_summary_inputs"
+
+    docuid: str
+    summary_input_json: str
+    doc_kind: Optional[str]
+    source: Optional[str]
+    parser_type: Optional[str]
+    standardized_doc_text: str
+    adi_structured_json: Optional[str]
+    doc_avg_conf: Optional[float]
+    doc_low_conf_words: int
+    doc_total_words: int
+    batch_id: Optional[str] = None
+    task_id: Optional[str] = None
