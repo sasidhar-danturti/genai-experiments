@@ -16,10 +16,23 @@ class _AggregationWorker(RecordWorker):
 
 
 class AggregationRunner(BaseRunner, ABC):
-    required_class_vars = ("input_table", "output_tables")
     input_table: Optional[str] = None
     output_tables: Optional[Sequence[str]] = None
     output_tier: str = "bronze"
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        super(BaseRunner, cls).__init_subclass__(**kwargs)
+        if getattr(cls, "__abstractmethods__", None):
+            return
+        missing = [
+            name
+            for name in ("input_table", "output_tables")
+            if getattr(cls, name, None) is None
+        ]
+        if missing:
+            raise TypeError(
+                f"{cls.__name__} must define class variables: {', '.join(missing)}"
+            )
 
     def __init__(
         self,
