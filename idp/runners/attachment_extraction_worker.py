@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import email
+import importlib.util
 from email import policy
 from email import message_from_binary_file
 from typing import Optional
@@ -80,6 +81,76 @@ class AttachmentExtractionWorker(RecordWorker):
         except Exception:
             return [{"attachment_name": None, "is_inline": False}]
 
+    def _extract_email_content_eml(self, file_path: str) -> tuple[str, list[str]]:
+        with open(file_path, "rb") as handle:
+            message = message_from_binary_file(handle, policy=policy.default)
+
+        from_ = message.get("From", "")
+        to_ = message.get("To", "")
+        cc_ = message.get("Cc", "")
+
+        body = ""
+        if message.is_multipart():
+            for part in message.walk():
+                if part.get_content_type() == "text/plain" and not part.get_filename():
+                    try:
+                        body = part.get_content()
+                        break
+                    except Exception:
+                        body = ""
+        else:
+            try:
+                body = message.get_content()
+            except Exception:
+                body = ""
+
+        inline_names = []
+        for part in message.walk():
+            if part.get_content_maintype() == "multipart":
+                continue
+            content_disposition = (part.get("Content-Disposition") or "").lower()
+            if "inline" in content_disposition:
+                inline_names.append(part.get_filename() or "inline")
+
+        content = f"From: {from_}\nTo: {to_}\nCc: {cc_}\n\n{body}"
+        return content, inline_names
+
+    def _extract_email_content_msg(self, file_path: str) -> tuple[str, list[str]]:
+        inline_names: list[str] = []
+        if importlib.util.find_spec("extract_msg") is None:
+            return "", inline_names
+        import extract_msg
+
+        msg = extract_msg.openMsg(file_path)
+        try:
+            from_ = msg.sender or ""
+            to_ = msg.to or ""
+            cc_ = msg.cc or ""
+            body = msg.body or ""
+            for att in msg.attachments:
+                if getattr(att, "cid", None):
+                    inline_names.append(att.longFilename or att.shortFilename or "inline")
+            content = f"From: {from_}\nTo: {to_}\nCc: {cc_}\n\n{body}"
+            return content, inline_names
+        finally:
+            msg.close()
+
+    def _build_email_content(self, file_path: str, file_extension: str) -> tuple[str, list[str]]:
+        if not file_path or not file_extension:
+            return "", []
+        ext = file_extension.lower()
+        if ext in ("eml", "email"):
+            return self._extract_email_content_eml(file_path)
+        if ext == "msg":
+            return self._extract_email_content_msg(file_path)
+        return "", []
+
+    def _add_inline_markers(self, content: str, inline_names: list[str]) -> str:
+        if not inline_names:
+            return content
+        markers = "\n".join(f"[INLINE_ATTACHMENT: {name}]" for name in inline_names)
+        return f"{content}\n\n{markers}"
+
     def process(self, record: DownloadProcessOutput) -> list[AttachmentExtractionOutput]:
         file_extension = ""
         if record.file_path:
@@ -87,6 +158,10 @@ class AttachmentExtractionWorker(RecordWorker):
             file_extension = ext.lstrip(".")
         file_name = os.path.basename(record.file_path or "")
         attachments = self._extract_email_attachments(record.file_path, file_extension)
+        email_content, inline_names = self._build_email_content(record.file_path, file_extension)
+        email_content = self._add_inline_markers(email_content, inline_names)
+        inline_names_str = ", ".join(inline_names) if inline_names else None
+        has_inline_attachments = bool(inline_names)
 
         outputs: list[AttachmentExtractionOutput] = []
         for idx, attachment in enumerate(attachments):
@@ -134,6 +209,9 @@ class AttachmentExtractionWorker(RecordWorker):
                     attachment_name=attachment_name,
                     is_inline=is_inline,
                     downloaded_attachment_path=downloaded_path,
+                    email_content=email_content or None,
+                    has_inline_attachments=has_inline_attachments,
+                    inline_attachment_names=inline_names_str,
                     status=status,
                 )
             )

@@ -74,6 +74,9 @@ class AttachmentExtractionOutput(SparkModel):
     attachment_name: Optional[str]
     is_inline: bool
     downloaded_attachment_path: str
+    email_content: Optional[str]
+    has_inline_attachments: bool
+    inline_attachment_names: Optional[str]
     status: str
     batch_id: Optional[str] = None
     task_id: Optional[str] = None
